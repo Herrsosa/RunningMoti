@@ -1,0 +1,476 @@
+/* style.css - COMBINED STYLES */
+
+:root {
+  --background-dark: #1a1a1d; /* Very dark gray */
+  --content-bg: #2c2c31;      /* Slightly lighter dark gray for content */
+  --input-bg: #3a3a40;        /* Darker gray for inputs/buttons */
+  --button-bg: #404045;       /* Default button background */
+  --button-active-bg: #0d6efd; /* Blue for active button (Bootstrap primary) */
+  --text-light: #f8f9fa;      /* Light text (Bootstrap light) */
+  --text-muted: #adb5bd;      /* Muted text (Bootstrap secondary) */
+  --primary-blue: #0d6efd;    /* Primary blue */
+  --danger-red: #dc3545;      /* Red for errors */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--text-light);
+  background-color: var(--background-dark); /* Fallback */
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-top: 60px; /* Add padding to prevent content from hiding under fixed nav */
+}
+
+.background-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* --- PASTE YOUR IMAGE FILENAME HERE --- */
+  background: url('runner.png') no-repeat center center fixed;
+  /* --- --- */
+  background-size: cover;
+  z-index: -2;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(26, 26, 29, 0.25); /* Dark semi-transparent overlay */
+  z-index: -1;
+}
+
+.main-container {
+  max-width: 650px; /* Slightly wider to accommodate tabs etc. */
+  margin: 0 auto;
+  padding: 20px 15px; /* Adjusted padding */
+}
+
+/* Header Section */
+.header-section {
+  margin-bottom: 30px; /* Reduced margin */
+}
+
+.fuel-fire-text {
+    font-size: 1.3rem; /* Adjusted size */
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 0.8rem; /* Adjusted margin */
+}
+
+/* Removed the standalone .create-track-btn as it's less relevant now */
+
+.main-headline {
+  font-size: 2.5rem; /* Adjusted size */
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+/* Form Section (Applied to generator and library containers) */
+.form-section {
+  background-color: var(--content-bg);
+  padding: 30px;
+  border-radius: 15px;
+  /* Removed margin-top as spacing is handled by containers */
+}
+
+.step {
+  margin-bottom: 20px; /* Adjusted margin */
+}
+
+.step-label-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px; /* Adjusted margin */
+}
+
+.step-number {
+    background-color: var(--input-bg);
+    color: var(--text-muted);
+    font-size: 0.75rem; /* Adjusted size */
+    font-weight: bold;
+    padding: 2px 6px; /* Adjusted padding */
+    border-radius: 4px;
+    margin-right: 8px; /* Adjusted margin */
+    min-width: 18px; /* Ensure number circle looks okay */
+    text-align: center;
+}
+
+.step-title {
+    font-size: 1rem; /* Adjusted size */
+    font-weight: bold;
+    color: var(--text-light);
+}
+
+.custom-input {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-bg);
+  color: var(--text-light);
+  border-radius: 8px;
+  padding: 10px 12px; /* Adjusted padding */
+  font-size: 0.95rem; /* Adjusted size */
+}
+
+.custom-input::placeholder {
+  color: var(--text-muted);
+}
+
+.custom-input:focus {
+  background-color: var(--input-bg);
+  color: var(--text-light);
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Style for invalid input */
+.custom-input.is-invalid {
+    border-color: var(--danger-red);
+}
+.custom-input.is-invalid:focus {
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+.invalid-feedback {
+    color: var(--danger-red);
+    font-size: 0.8em; /* Adjusted size */
+    margin-top: .25rem;
+    display: none;
+}
+.is-invalid ~ .invalid-feedback, /* Direct sibling */
+.button-group.is-invalid + .invalid-feedback /* Sibling after button group */
+ {
+    display: block;
+}
+
+/* Button Group Styling */
+.button-group {
+  display: flex;
+  gap: 8px; /* Adjusted gap */
+  flex-wrap: wrap;
+}
+/* Style for invalid button group */
+.button-group.is-invalid .option-button {
+    /* Optional: Add a visual cue */
+    /* border: 1px solid var(--danger-red); */
+}
+
+.option-button {
+  background-color: var(--button-bg);
+  border: none;
+  color: var(--text-light);
+  padding: 8px 12px; /* Adjusted padding */
+  border-radius: 8px;
+  font-size: 0.85rem; /* Adjusted size */
+  transition: background-color 0.2s ease-in-out;
+  flex-grow: 1;
+  text-align: center;
+  cursor: pointer;
+}
+
+.option-button:hover {
+  background-color: #5a5a61;
+   color: var(--text-light);
+}
+
+.option-button.active {
+  background-color: var(--button-active-bg);
+  color: white;
+  font-weight: bold;
+}
+
+/* Audio Player Styling */
+.audio-container {
+    background-color: var(--input-bg);
+    padding: 15px; /* Adjusted padding */
+    border-radius: 8px;
+    margin-top: 20px; /* Ensure space above */
+}
+.result-heading {
+    font-size: 1.1rem; /* Adjusted size */
+    margin-bottom: 10px; /* Adjusted margin */
+    color: var(--text-light);
+}
+.custom-audio-player {
+    filter: invert(1) sepia(1) saturate(0) hue-rotate(180deg);
+    height: 45px; /* Consistent height */
+    max-width: 100%;
+}
+
+/* Lyrics Details/Summary */
+.lyrics-details summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.85rem; /* Adjusted size */
+    margin-bottom: 5px;
+}
+.lyrics-details summary:hover {
+    color: var(--text-light);
+}
+.lyrics-details pre {
+    background-color: var(--background-dark);
+    border: 1px solid var(--button-bg);
+    color: var(--text-muted);
+    font-size: 0.8rem; /* Adjusted size */
+    max-height: 180px; /* Adjusted height */
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    padding: 10px; /* Added padding */
+    border-radius: 5px; /* Added radius */
+}
+
+
+/* Loading Indicator */
+#loadingIndicator p {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+#loadingIndicator .spinner-border {
+    color: var(--primary-blue) !important;
+    width: 2rem; /* Adjusted size */
+    height: 2rem; /* Adjusted size */
+}
+
+
+/* Motivate Button */
+.motivate-button {
+  background-color: var(--primary-blue);
+  border: none;
+  color: white;
+  padding: 12px 15px; /* Adjusted padding */
+  border-radius: 8px;
+  font-size: 1.1rem; /* Adjusted size */
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.motivate-button:hover:not(:disabled) {
+  background-color: #0b5ed7;
+   color: white;
+}
+.motivate-button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+
+/* Hide initially hidden inputs */
+input[type="hidden"] {
+    display: none;
+}
+
+/* General Error Message */
+#generalError.alert { /* More specific */
+    background-color: rgba(220, 53, 69, 0.15); /* Slightly adjusted */
+    border: 1px solid var(--danger-red);
+    color: var(--danger-red);
+    padding: 10px 15px; /* Adjusted padding */
+    font-size: 0.9em;
+}
+
+/* --- User Navigation --- */
+.user-nav {
+    position: fixed; /* Make it fixed */
+    top: 0;
+    left: 0; /* Align to top-left */
+    width: 100%; /* Full width */
+    z-index: 1030; /* Ensure it's above other content (Bootstrap standard) */
+    color: var(--text-light);
+    font-size: 0.9em;
+    background-color: rgba(26, 26, 29, 0.9); /* Darker, less transparent */
+    padding: 8px 20px; /* Adjusted padding */
+    display: flex; /* Use flexbox for alignment */
+    justify-content: flex-end; /* Align items to the right */
+    align-items: center; /* Center items vertically */
+    border-bottom: 1px solid var(--button-bg); /* Subtle bottom border */
+}
+.user-nav button {
+    font-size: 0.85em;
+}
+#userInfo span {
+    font-weight: bold;
+}
+#authButtons {
+    margin-left: auto; /* Push auth buttons to the right if userInfo is hidden */
+}
+
+/* --- Modals --- */
+.modal-content.bg-dark {
+    background-color: var(--content-bg) !important;
+    border: 1px solid var(--button-bg);
+}
+.modal-header.border-secondary {
+    border-bottom: 1px solid var(--button-bg) !important;
+}
+/* Ensure modal inputs use custom style */
+.modal-body .form-control {
+     background-color: var(--input-bg);
+     border: 1px solid var(--input-bg);
+     color: var(--text-light);
+}
+.modal-body .form-control:focus {
+     background-color: var(--input-bg);
+     color: var(--text-light);
+     border-color: var(--primary-blue);
+     box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.modal-body .alert { /* Style modal errors */
+     padding: 8px 12px;
+     font-size: 0.85em;
+}
+/* Make modal body have more padding */
+.modal-lg .modal-body {
+    padding: 2rem; /* Increase padding inside large modals */
+}
+
+/* Slightly larger font size for modal labels */
+.modal-lg .modal-body .form-label {
+    font-size: 0.95rem; /* Optional: slightly larger labels */
+}
+
+/* Ensure buttons within modals are appropriately sized */
+.modal-lg .modal-body .btn {
+    padding: 10px 15px; /* Adjust button padding if needed */
+    font-size: 1rem; /* Adjust button font size if needed */
+}
+
+/* --- App Tabs --- */
+.nav-pills .nav-link {
+    color: var(--text-muted);
+    background-color: var(--button-bg);
+    margin: 0 5px;
+    border: none;
+    padding: 8px 15px; /* Adjusted padding */
+    font-size: 0.9rem; /* Adjusted size */
+    border-radius: 8px; /* Match other buttons */
+}
+.nav-pills .nav-link.active {
+    color: white;
+    background-color: var(--primary-blue);
+    font-weight: bold;
+}
+.nav-pills .nav-link:hover:not(.active) {
+    background-color: #5a5a61;
+}
+/* Ensure tab content has some top margin */
+.tab-content {
+    margin-top: 25px;
+}
+
+/* --- Library --- */
+/* Library shares .form-section background */
+.library-section h2 {
+    color: var(--text-light);
+}
+
+.library-list .list-group-item {
+    background-color: var(--input-bg);
+    border: 1px solid var(--button-bg);
+    margin-bottom: 10px;
+    border-radius: 8px;
+    color: var(--text-light);
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.library-item-info {
+    flex-grow: 1;
+    margin-right: 15px;
+}
+.library-item-info h5 {
+    margin-bottom: 5px;
+    font-size: 1.05rem; /* Adjusted size */
+    color: var(--text-light);
+}
+.library-item-info p {
+    font-size: 0.8em; /* Adjusted size */
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    line-height: 1.3;
+}
+.library-item-controls {
+    display: flex; /* Align player and button */
+    align-items: center;
+}
+.library-item-controls .library-audio-player { /* Target specifically */
+     max-width: 250px;
+     height: 40px;
+     filter: invert(1) sepia(1) saturate(0) hue-rotate(180deg);
+     margin-right: 10px; /* Space between player and button */
+}
+.library-item-controls .badge { /* Style status badges */
+    margin-right: 10px;
+    padding: 5px 8px;
+    font-size: 0.75rem;
+}
+.library-item-controls .btn-delete-song {
+    font-size: 0.8rem;
+    padding: 5px 8px;
+}
+
+/* Library loading/empty states */
+#libraryLoading, #libraryEmpty {
+    margin-top: 20px;
+    color: var(--text-muted);
+}
+
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .main-container {
+         max-width: 95%;
+         padding: 15px;
+    }
+     .main-headline {
+        font-size: 2rem; /* Smaller headline */
+    }
+    .form-section {
+        padding: 20px; /* Less padding */
+    }
+     .user-nav {
+         padding: 8px 10px;
+         font-size: 0.8em;
+    }
+}
+
+@media (max-width: 576px) {
+     body {
+         padding-top: 50px; /* Adjust for smaller nav height potentially */
+     }
+     .main-headline {
+        font-size: 1.8rem;
+    }
+     .nav-pills .nav-link {
+         font-size: 0.8rem;
+         padding: 6px 10px;
+     }
+     .motivate-button {
+         font-size: 1rem;
+     }
+
+    /* Library responsive adjustments */
+    .library-item-info {
+        margin-right: 0;
+        margin-bottom: 10px;
+        width: 100%;
+    }
+    .library-item-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+     .library-item-controls .library-audio-player {
+        max-width: calc(100% - 60px); /* Adjust width leaving space for delete */
+    }
+}
