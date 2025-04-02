@@ -40,7 +40,7 @@ router.post('/generate-lyrics', verifyToken, async (req, res) => {
         const { workout, musicStyle, name } = req.body;
 
         const response = await axios.post(process.env.OPENAI_API_ENDPOINT, {
-            model: "gpt-3.5-turbo", // Or your preferred model
+            model: "gpt-4", // Or your preferred model
             messages: [{
                 role: "user",
                 content: `Write a short motivational song (around 1-2 minutes reading time) for ${name || 'Athlete'}, who is doing a ${workout}. The song should match the style of ${musicStyle}. Make it energetic and uplifting.` // Adjust prompt as needed
