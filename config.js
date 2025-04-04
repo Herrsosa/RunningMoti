@@ -1,2 +1,2 @@
 // Backend API endpoint
-const BACKEND_API_ENDPOINT = 'http://localhost:5000/api';
+const BACKEND_API_ENDPOINT = 'https://running-moti.vercel.app/api';
