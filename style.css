@@ -474,3 +474,76 @@ input[type="hidden"] {
         max-width: calc(100% - 60px); /* Adjust width leaving space for delete */
     }
 }
+
+/* Payment Form Styles */
+#payment-form {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+#payment-element {
+    margin-bottom: 24px;
+}
+
+#submit {
+    background: #5469d4;
+    color: #ffffff;
+    border-radius: 4px;
+    border: 0;
+    padding: 12px 16px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    display: block;
+    width: 100%;
+    transition: all 0.2s ease;
+}
+
+#submit:hover {
+    background: #4054b2;
+}
+
+#submit:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+#error-message {
+    color: #dc3545;
+    margin-top: 16px;
+    text-align: center;
+}
+
+/* Payment Complete Page Styles */
+.payment-complete-container {
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.success-message {
+    color: #28a745;
+    margin: 20px 0;
+}
+
+.error-message {
+    color: #dc3545;
+    margin: 20px 0;
+}
+
+.button {
+    display: inline-block;
+    padding: 12px 24px;
+    background: #5469d4;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    margin-top: 20px;
+    transition: background 0.2s ease;
+}
+
+.button:hover {
+    background: #4054b2;
+}

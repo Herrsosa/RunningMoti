@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="style.css" /> <!-- Optional: use same styling -->
+    <style>
+        /* Add specific styles for this page if needed */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+             padding-top: 0; /* Override padding from main style.css */
+        }
+        .verification-box {
+            background-color: var(--content-bg);
+            padding: 30px 40px;
+            border-radius: 15px;
+            max-width: 500px;
+             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Optional: Background elements -->
+    <!-- <div class="background-image"></div> -->
+    <!-- <div class="overlay"></div> -->
+
+    <div class="verification-box text-light">
+        <h2 id="verificationTitle">Verifying...</h2>
+        <div id="successMessage" style="display: none;" class="alert alert-success mt-3">
+            Email verified successfully! You can now log in.
+        </div>
+        <div id="errorMessage" style="display: none;" class="alert alert-danger mt-3">
+            Verification failed. <span id="errorReason"></span>
+        </div>
+        <a href="/" class="btn btn-primary mt-4">Go to Login</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const status = params.get('status');
+            const messageCode = params.get('message');
+
+            const titleEl = document.getElementById('verificationTitle');
+            const successEl = document.getElementById('successMessage');
+            const errorEl = document.getElementById('errorMessage');
+            const errorReasonEl = document.getElementById('errorReason');
+
+            if (status === 'success') {
+                titleEl.textContent = 'Verification Successful!';
+                successEl.style.display = 'block';
+                if (messageCode === 'Already_verified') {
+                     successEl.textContent = 'Your email address was already verified. You can log in.';
+                }
+            } else if (status === 'error') {
+                titleEl.textContent = 'Verification Failed';
+                errorEl.style.display = 'block';
+                let reason = "Invalid or expired link."; // Default
+                if (messageCode === 'Missing_token') {
+                     reason = "Verification link is incomplete.";
+                } else if (messageCode === 'Expired_link') {
+                     reason = "This verification link has expired. Please try registering again.";
+                } else if (messageCode === 'Database_error' || messageCode === 'Verification_failed') {
+                     reason = "An internal error occurred. Please try again later or contact support.";
+                }
+                 errorReasonEl.textContent = reason;
+            } else {
+                 // Should not happen if redirected correctly
+                 titleEl.textContent = 'Verification Status Unknown';
+                 errorEl.style.display = 'block';
+                 errorReasonEl.textContent = "Could not determine verification status.";
+            }
+        });
+    </script>
+</body>
+</html>

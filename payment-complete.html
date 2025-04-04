@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Complete</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="payment-complete-container">
+        <h1>Payment Complete</h1>
+        <div id="payment-status"></div>
+        <a href="/" class="button">Return to Home</a>
+    </div>
+
+    <script>
+        // Check the payment status
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentStatus = urlParams.get('payment_intent');
+        
+        const statusElement = document.getElementById('payment-status');
+        
+        if (paymentStatus) {
+            statusElement.innerHTML = `
+                <div class="success-message">
+                    <h2>Thank you for your payment!</h2>
+                    <p>Your transaction has been completed successfully.</p>
+                </div>
+            `;
+        } else {
+            statusElement.innerHTML = `
+                <div class="error-message">
+                    <h2>Something went wrong</h2>
+                    <p>Please contact support if you believe this is an error.</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html> 

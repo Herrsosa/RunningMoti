@@ -9,6 +9,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') }); // Explicit
 const authRoutes = require('./routes/auth');
 const generateRoutes = require('./routes/generate');
 const libraryRoutes = require('./routes/library');
+const stripeRoutes = require('./routes/stripe');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +19,9 @@ app.use(cors()); // Consider more restrictive CORS settings for production
 app.use(express.json()); // For parsing application/json
 app.use(express.urlencoded({ extended: true })); // If using callbacks via form post
 
+// Special handling for Stripe webhooks
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
 // --- Static Files ---
 // Serve frontend files (HTML, CSS, JS, images) from the parent directory
 app.use(express.static(path.join(__dirname, '..')));
@@ -26,6 +30,7 @@ app.use(express.static(path.join(__dirname, '..')));
 app.use('/api/auth', authRoutes);
 app.use('/api/generate', generateRoutes); // Prefix generate routes
 app.use('/api/library', libraryRoutes);  // Prefix library routes
+app.use('/api/stripe', stripeRoutes);    // Add Stripe routes
 
 // --- Serve index.html for the root path and potentially other frontend routes ---
 app.get('/', (req, res) => {

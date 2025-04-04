@@ -1,484 +1,619 @@
 // main.js
 document.addEventListener('DOMContentLoaded', function () {
-  // --- STATE ---
-  let currentUser = {
-      token: localStorage.getItem('authToken'),
-      id: null,
-      username: null,
-      credits: 0
-  };
+    // --- STATE ---
+    let currentUser = {
+        token: localStorage.getItem('authToken'),
+        id: null,
+        username: null,
+        credits: 0
+    };
 
-  // --- DOM Elements ---
-  const appContainer = document.getElementById('appContainer');
-  const userInfoDiv = document.getElementById('userInfo');
-  const usernameDisplay = document.getElementById('usernameDisplay');
-  const creditsDisplay = document.getElementById('creditsDisplay');
-  const authButtonsDiv = document.getElementById('authButtons');
-  const showLoginBtn = document.getElementById('showLoginBtn');
-  const showSignupBtn = document.getElementById('showSignupBtn');
-  const logoutButton = document.getElementById('logoutButton');
-  const loginModalEl = document.getElementById('loginModal');
-  const signupModalEl = document.getElementById('signupModal');
-  const loginForm = document.getElementById('loginForm');
-  const signupForm = document.getElementById('signupForm');
-  const loginErrorDiv = document.getElementById('loginError');
-  const signupErrorDiv = document.getElementById('signupError');
-  const libraryContent = document.getElementById('libraryContent');
-  const libraryLoading = document.getElementById('libraryLoading');
-  const libraryEmpty = document.getElementById('libraryEmpty');
-  const appTabs = document.getElementById('appTabs');
+    // --- DOM Elements ---
+    const appContainer = document.getElementById('appContainer');
+    const userInfoDiv = document.getElementById('userInfo');
+    const usernameDisplay = document.getElementById('usernameDisplay');
+    const creditsDisplay = document.getElementById('creditsDisplay');
+    const authButtonsDiv = document.getElementById('authButtons');
+    const showLoginBtn = document.getElementById('showLoginBtn');
+    const showSignupBtn = document.getElementById('showSignupBtn');
+    const logoutButton = document.getElementById('logoutButton');
+    const loginModalEl = document.getElementById('loginModal');
+    const signupModalEl = document.getElementById('signupModal');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginErrorDiv = document.getElementById('loginError');
+    const signupErrorDiv = document.getElementById('signupError');
+    const libraryContent = document.getElementById('libraryContent');
+    const libraryLoading = document.getElementById('libraryLoading');
+    const libraryEmpty = document.getElementById('libraryEmpty');
+    const appTabs = document.getElementById('appTabs');
+    const loggedOutCTA = document.getElementById('loggedOutCTA'); // Get CTA div reference
 
-  // Generator Form Elements
-  const songForm = document.getElementById('songForm');
-  const nameInput = document.getElementById('nameInput');
-  const workoutInput = document.getElementById('workoutInput');
-  const toneButtonsContainer = document.getElementById('toneButtons');
-  const musicStyleInput = document.getElementById('musicStyleInput');
-  const loadingIndicator = document.getElementById('loadingIndicator');
-  const loadingMessage = document.getElementById('loadingMessage'); // Get loading message p tag
-  const lyricsOutput = document.getElementById('lyricsOutput');
-  const audioPlayer = document.getElementById('audioPlayer');
-  const audioResultContainer = document.getElementById('audioResultContainer');
-  const motivateButton = document.getElementById('motivateButton');
-  const generalErrorDiv = document.getElementById('generalError');
-  const workoutErrorDiv = document.getElementById('workout-error');
-  const toneErrorDiv = document.getElementById('tone-error');
+    // Generator Form Elements
+    const songForm = document.getElementById('songForm');
+    const nameInput = document.getElementById('nameInput');
+    const workoutInput = document.getElementById('workoutInput');
+    const toneButtonsContainer = document.getElementById('toneButtons');
+    const musicStyleInput = document.getElementById('musicStyleInput');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const lyricsOutput = document.getElementById('lyricsOutput');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const audioResultContainer = document.getElementById('audioResultContainer');
+    const motivateButton = document.getElementById('motivateButton');
+    const generalErrorDiv = document.getElementById('generalError');
+    const workoutErrorDiv = document.getElementById('workout-error');
+    const toneErrorDiv = document.getElementById('tone-error');
 
-  // Bootstrap Modals Instances
-  const loginModal = new bootstrap.Modal(loginModalEl);
-  const signupModal = new bootstrap.Modal(signupModalEl);
-
-  // --- API Endpoints ---
-  const BASE_API_URL = 'http://localhost:5000/api'; // Use your backend URL
-
-  // --- Utility Functions ---
-  const updateUIBasedOnLoginState = () => {
-      if (currentUser.token) {
-          userInfoDiv.style.display = 'block';
-          authButtonsDiv.style.display = 'none';
-          appContainer.style.display = 'block'; // Show main app content
-          usernameDisplay.textContent = currentUser.username || 'User';
-          creditsDisplay.textContent = currentUser.credits;
-          fetchUserProfile(); // Fetch latest credits/info
-          loadLibrary(); // Load library when logged in
-      } else {
-          userInfoDiv.style.display = 'none';
-          authButtonsDiv.style.display = 'block';
-          appContainer.style.display = 'none'; // Hide main app content
-           // Optionally force login modal if no token
-           // loginModal.show();
-      }
-      // Reset forms and errors on state change
-      loginErrorDiv.style.display = 'none';
-      signupErrorDiv.style.display = 'none';
-      loginForm.reset();
-      signupForm.reset();
-      generalErrorDiv.style.display = 'none';
-      loadingIndicator.style.display = 'none';
-      audioResultContainer.style.display = 'none';
-  };
-
-  const showApiError = (errorDiv, error, defaultMessage = "An error occurred.") => {
-      console.error("API Error:", error);
-      let message = defaultMessage;
-      if (error && error.error) {
-          message = error.error;
-      } else if (typeof error === 'string') {
-           message = error;
-      } else if (error instanceof Error) {
-          message = error.message;
-      }
-      errorDiv.textContent = message;
-      errorDiv.style.display = 'block';
-  };
-
-  // --- API Call Functions ---
-  const apiRequest = async (endpoint, method = 'GET', body = null, requiresAuth = true) => {
-      const options = {
-          method: method,
-          headers: {
-              'Content-Type': 'application/json',
-          },
-      };
-      if (requiresAuth && currentUser.token) {
-          options.headers['Authorization'] = `Bearer ${currentUser.token}`;
-      }
-      if (body) {
-          options.body = JSON.stringify(body);
-      }
-
-      try {
-          const response = await fetch(`${BASE_API_URL}${endpoint}`, options);
-          if (!response.ok) {
-              let errorData;
-              try {
-                   errorData = await response.json();
-              } catch(e) {
-                  errorData = { error: `HTTP error! status: ${response.status}` };
-              }
-               // Handle token expiry / unauthorized specifically
-               if (response.status === 401 || response.status === 403) {
-                   console.log("Auth token expired or invalid. Logging out.");
-                   handleLogout();
-                   throw new Error("Your session has expired. Please login again."); // Throw specific error
-               }
-              throw errorData; // Throw the error object from response body
-          }
-           // Handle potential empty responses (e.g., 204 No Content)
-          if (response.status === 204) {
-              return null;
-          }
-          return await response.json(); // Parse JSON for successful responses
-      } catch (error) {
-          console.error(`API Request Failed (${method} ${endpoint}):`, error);
-          throw error; // Re-throw the error to be caught by the caller
-      }
-  };
-
-  // --- Authentication Functions ---
-  const handleLogin = async (email, password) => {
-      loginErrorDiv.style.display = 'none';
-      try {
-          const data = await apiRequest('/auth/login', 'POST', { email, password }, false);
-          currentUser.token = data.token;
-          currentUser.id = data.userId;
-          currentUser.username = data.username;
-          currentUser.credits = data.credits;
-          localStorage.setItem('authToken', data.token);
-          updateUIBasedOnLoginState();
-          loginModal.hide();
-      } catch (error) {
-          showApiError(loginErrorDiv, error, "Login failed. Please check email/password.");
-      }
-  };
-
-  const handleSignup = async (username, email, password, confirmPassword) => {
-      signupErrorDiv.style.display = 'none';
-      if (password !== confirmPassword) {
-          showApiError(signupErrorDiv, "Passwords do not match.");
-          return;
-      }
-      try {
-           const data = await apiRequest('/auth/register', 'POST', { username, email, password }, false);
-           // Automatically log in after successful signup
-           currentUser.token = data.token;
-           currentUser.id = data.userId;
-           currentUser.username = data.username;
-           currentUser.credits = data.credits;
-           localStorage.setItem('authToken', data.token);
-           updateUIBasedOnLoginState();
-           signupModal.hide();
-      } catch (error) {
-           showApiError(signupErrorDiv, error, "Signup failed.");
-      }
-  };
-
-  const handleLogout = () => {
-      currentUser.token = null;
-      currentUser.id = null;
-      currentUser.username = null;
-      currentUser.credits = 0;
-      localStorage.removeItem('authToken');
-      updateUIBasedOnLoginState();
-       // Clear library on logout
-      libraryContent.innerHTML = '';
-      libraryLoading.style.display = 'block';
-      libraryEmpty.style.display = 'none';
-  };
-
-  const fetchUserProfile = async () => {
-      if (!currentUser.token) return;
-      try {
-          const data = await apiRequest('/library/profile', 'GET');
-          currentUser.username = data.username;
-          currentUser.credits = data.credits;
-          // Update display immediately
-          usernameDisplay.textContent = currentUser.username;
-          creditsDisplay.textContent = currentUser.credits;
-      } catch (error) {
-          console.error("Failed to fetch user profile:", error);
-          // Potentially logout if profile fetch fails due to auth error
-           if (error.message.includes("session has expired")) {
-               // Error already handled by apiRequest logout logic
-           } else {
-                // showApiError(generalErrorDiv, error, "Could not load profile.");
-           }
-      }
-  };
+    // Bootstrap Modals Instances
+    let loginModalInstance, signupModalInstance;
+    if (loginModalEl) {
+        loginModalInstance = new bootstrap.Modal(loginModalEl);
+    }
+    if (signupModalEl) {
+        signupModalInstance = new bootstrap.Modal(signupModalEl);
+    }
 
 
-  // --- Library Functions ---
-  const loadLibrary = async () => {
-      if (!currentUser.token) return;
-
-      libraryLoading.style.display = 'block';
-      libraryEmpty.style.display = 'none';
-      libraryContent.innerHTML = ''; // Clear previous items
-
-      try {
-          const songs = await apiRequest('/library/songs', 'GET');
-          libraryLoading.style.display = 'none';
-
-          if (songs && songs.length > 0) {
-              songs.forEach(renderLibraryItem);
-          } else {
-              libraryEmpty.style.display = 'block';
-          }
-      } catch (error) {
-          libraryLoading.style.display = 'none';
-          showApiError(generalErrorDiv, error, "Failed to load library."); // Show error in general area
-      }
-  };
-
-  const renderLibraryItem = (song) => {
-       const item = document.createElement('div');
-       item.className = 'list-group-item library-list-item';
-       item.dataset.songId = song.id;
-
-       const formattedDate = new Date(song.created_at).toLocaleDateString();
-
-       let playerHtml = '';
-       if (song.status === 'complete' && song.audio_url) {
-           playerHtml = `<audio controls src="${song.audio_url}" class="library-audio-player"></audio>`;
-       } else if (song.status === 'processing') {
-            playerHtml = `<span class="badge bg-info text-dark">Processing...</span>`;
-       } else if (song.status === 'pending') {
-           playerHtml = `<span class="badge bg-secondary">Pending...</span>`;
-       } else {
-            playerHtml = `<span class="badge bg-danger">Error</span>`;
-       }
-
-       item.innerHTML = `
-          <div class="library-item-info">
-              <h5>${song.title || 'Untitled Song'}</h5>
-              <p>Workout: ${song.workout_input || 'N/A'}<br>Style: ${song.style_input || 'N/A'} | Date: ${formattedDate}</p>
-          </div>
-          <div class="library-item-controls">
-              ${playerHtml}
-              <button class="btn btn-sm btn-outline-danger btn-delete-song" data-song-id="${song.id}">Delete</button>
-          </div>
-      `;
-      libraryContent.appendChild(item);
-  };
-
-   const handleDeleteSong = async (songId) => {
-      if (!confirm("Are you sure you want to delete this song?")) return;
-
-      try {
-          await apiRequest(`/library/songs/${songId}`, 'DELETE');
-          // Remove item from UI
-          const itemToRemove = libraryContent.querySelector(`.library-list-item[data-song-id="${songId}"]`);
-          if(itemToRemove) itemToRemove.remove();
-           // Check if library is now empty
-           if (libraryContent.children.length === 0) {
-               libraryEmpty.style.display = 'block';
-           }
-           // No need to reload entire library, just remove the element
-      } catch (error) {
-           showApiError(generalErrorDiv, error, "Failed to delete song.");
-      }
-  };
+    // --- API Endpoints (Using config.js if available, otherwise default) ---
+    // Assuming config.js defines BACKEND_API_ENDPOINT like:
+    // const BACKEND_API_ENDPOINT = 'http://localhost:5000/api';
+    const BASE_API_URL = typeof BACKEND_API_ENDPOINT !== 'undefined' ? BACKEND_API_ENDPOINT : 'http://localhost:5000/api';
 
 
-  // --- Generator Functions ---
-  // (Button group handler - Keep as is)
-  function handleButtonGroupClick(container, hiddenInput, errorDiv, groupElement) {
-    container.addEventListener('click', function (e) {
-      if (e.target.classList.contains('option-button')) {
-        groupElement.classList.remove('is-invalid');
-        if(errorDiv) errorDiv.style.display = 'none'; // Hide error on selection
-        container.querySelectorAll('.option-button').forEach(btn => btn.classList.remove('active'));
-        e.target.classList.add('active');
-        hiddenInput.value = e.target.getAttribute('data-value');
-      }
-    });
-  }
-  handleButtonGroupClick(toneButtonsContainer, musicStyleInput, toneErrorDiv, toneButtonsContainer);
+    // --- Utility Functions ---
+    const updateUIBasedOnLoginState = () => {
+        if (!userInfoDiv || !authButtonsDiv || !appContainer || !usernameDisplay || !creditsDisplay) {
+            console.error("Core UI elements not found. Check HTML IDs.");
+            return; // Prevent errors if elements are missing
+        }
 
-   workoutInput.addEventListener('input', () => {
-     workoutInput.classList.remove('is-invalid');
-     if(workoutErrorDiv) workoutErrorDiv.style.display = 'none';
-   });
+        if (currentUser.token) {
+            userInfoDiv.style.display = 'block';
+            authButtonsDiv.style.display = 'none';
+            appContainer.style.display = 'block';
+            if(loggedOutCTA) loggedOutCTA.style.display = 'none'; // Hide CTA when logged in
+
+            usernameDisplay.textContent = currentUser.username || 'User';
+            creditsDisplay.textContent = currentUser.credits;
+            fetchUserProfile(); // Fetch latest credits/info
+            // Only load library if library elements exist
+            if(libraryContent) {
+                loadLibrary();
+            }
+        } else {
+            userInfoDiv.style.display = 'none';
+            authButtonsDiv.style.display = 'block';
+            appContainer.style.display = 'none';
+            if(loggedOutCTA) loggedOutCTA.style.display = 'block'; // Show CTA when logged out
+
+            // Clear library if elements exist
+             if(libraryContent && libraryLoading && libraryEmpty) {
+                libraryContent.innerHTML = '';
+                libraryLoading.style.display = 'block';
+                libraryEmpty.style.display = 'none';
+             }
+        }
+        // Reset forms and errors
+        if(loginErrorDiv) loginErrorDiv.style.display = 'none';
+        if(signupErrorDiv) signupErrorDiv.style.display = 'none';
+        if(loginForm) loginForm.reset();
+        if(signupForm) signupForm.reset();
+        if(generalErrorDiv) generalErrorDiv.style.display = 'none';
+        if(loadingIndicator) loadingIndicator.style.display = 'none';
+        if(audioResultContainer) audioResultContainer.style.display = 'none';
+    };
+
+    const showApiError = (errorDiv, error, defaultMessage = "An error occurred.") => {
+        if (!errorDiv) return; // Don't proceed if error div doesn't exist
+        console.error("API Error:", error);
+        let message = defaultMessage;
+        // Check if error is the structured object from apiRequest
+        if (error && error.error) {
+            message = error.error;
+        // Check if error is a plain string
+        } else if (typeof error === 'string') {
+             message = error;
+        // Check if error is a standard Error object
+        } else if (error instanceof Error) {
+            message = error.message;
+        }
+        // Ensure message is a string before setting textContent
+        errorDiv.textContent = String(message);
+        errorDiv.style.display = 'block';
+    };
+
+    // --- API Call Functions ---
+    const apiRequest = async (endpoint, method = 'GET', body = null, requiresAuth = true) => {
+        const options = {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        };
+        if (requiresAuth && currentUser.token) {
+            options.headers['Authorization'] = `Bearer ${currentUser.token}`;
+        } else if (requiresAuth && !currentUser.token) {
+             // Immediately reject if auth is required but no token exists
+             console.warn(`Auth required for ${endpoint}, but no token found.`);
+             throw new Error("Please login first."); // Or specific error object
+        }
+
+        if (body) {
+            options.body = JSON.stringify(body);
+        }
+
+        try {
+            const response = await fetch(`${BASE_API_URL}${endpoint}`, options);
+
+            if (!response.ok) {
+                let errorData = { error: `Request failed with status: ${response.status}` }; // Default error
+                try {
+                     // Try to parse JSON error body from backend
+                     errorData = await response.json();
+                     // Ensure errorData has an 'error' property for consistency
+                     if (!errorData.error) {
+                         errorData = { error: JSON.stringify(errorData) }; // Fallback if no standard error field
+                     }
+                } catch(e) {
+                    // If parsing fails, use the default HTTP status error
+                    console.warn("Could not parse error response JSON body.");
+                }
+
+                 // Handle token expiry / unauthorized specifically
+                 if ((response.status === 401 || response.status === 403) && requiresAuth) {
+                     console.log("Authentication error (401/403). Logging out.");
+                     handleLogout(); // Log the user out
+                     // Throw a user-friendly error AFTER logging out
+                     throw new Error("Your session has expired or is invalid. Please login again.");
+                 }
+                throw errorData; // Throw the structured error object
+            }
+
+             // Handle potential empty responses (e.g., 204 No Content)
+            if (response.status === 204) {
+                return null; // Return null for empty successful responses
+            }
+            // Attempt to parse JSON for other successful responses
+             try {
+                 return await response.json();
+             } catch (e) {
+                 console.error(`Failed to parse JSON response for ${endpoint}:`, e);
+                 throw new Error("Received an invalid response from the server.");
+             }
+        } catch (error) {
+            console.error(`API Request Failed (${method} ${endpoint}):`, error);
+            // Re-throw the error (could be network error, JSON parse error, or the structured error from above)
+            throw error;
+        }
+    };
+
+    // --- Authentication Functions ---
+    const handleLogin = async (email, password) => {
+        if (!loginErrorDiv || !loginModalInstance) return;
+        loginErrorDiv.style.display = 'none';
+        try {
+            // Login endpoint doesn't require auth initially
+            const data = await apiRequest('/auth/login', 'POST', { email, password }, false);
+            currentUser.token = data.token;
+            currentUser.id = data.userId;
+            currentUser.username = data.username;
+            currentUser.credits = data.credits;
+            localStorage.setItem('authToken', data.token); // Store token
+            updateUIBasedOnLoginState(); // Update UI to logged-in state
+            loginModalInstance.hide(); // Hide modal on success
+        } catch (error) {
+            showApiError(loginErrorDiv, error, "Login failed. Please check email/password or verify your email.");
+        }
+    };
+
+    const handleSignup = async (username, email, password, confirmPassword) => {
+         if (!signupErrorDiv || !signupModalInstance || !generalErrorDiv || !signupForm) return;
+        signupErrorDiv.style.display = 'none';
+        generalErrorDiv.style.display = 'none'; // Hide general errors too
+
+        if (password !== confirmPassword) {
+            showApiError(signupErrorDiv, "Passwords do not match.");
+            return;
+        }
+        try {
+             // Register endpoint doesn't require auth
+             const data = await apiRequest('/auth/register', 'POST', { username, email, password }, false);
+
+             // --- Handle successful registration (verification needed) ---
+             signupModalInstance.hide();
+             signupForm.reset();
+
+             // Show success message (using general error div styled as success)
+             generalErrorDiv.classList.remove('alert-danger');
+             generalErrorDiv.classList.add('alert-success');
+             generalErrorDiv.textContent = data.message || "Registration successful! Please check your email (and spam folder) for a verification link.";
+             generalErrorDiv.style.display = 'block';
+
+             // Hide the success message after a delay
+             setTimeout(() => {
+                 if (generalErrorDiv) { // Check if element still exists
+                     generalErrorDiv.style.display = 'none';
+                     generalErrorDiv.classList.remove('alert-success');
+                     generalErrorDiv.classList.add('alert-danger'); // Reset class for future errors
+                     generalErrorDiv.textContent = '';
+                 }
+             }, 10000);
+            // --- User is NOT logged in yet ---
+
+        } catch (error) {
+             // Show specific signup error within the modal
+             showApiError(signupErrorDiv, error, "Signup failed. Please try again.");
+        }
+    };
+
+    const handleLogout = () => {
+        currentUser.token = null;
+        currentUser.id = null;
+        currentUser.username = null;
+        currentUser.credits = 0;
+        localStorage.removeItem('authToken'); // Remove token from storage
+        updateUIBasedOnLoginState(); // Update UI to logged-out state
+        console.log("User logged out.");
+    };
+
+    const fetchUserProfile = async () => {
+        // This function now runs *after* login state is confirmed by token presence
+        // apiRequest handles token presence and auth errors automatically
+        if (!currentUser.token) return; // Should not happen if called correctly, but good check
+
+        try {
+            const data = await apiRequest('/library/profile', 'GET'); // Requires auth
+            currentUser.username = data.username;
+            currentUser.credits = data.credits;
+            // Update display immediately
+             if (usernameDisplay) usernameDisplay.textContent = currentUser.username;
+             if (creditsDisplay) creditsDisplay.textContent = currentUser.credits;
+        } catch (error) {
+            // Error (like session expired) is handled by apiRequest, which calls handleLogout
+            // No need to call handleLogout again here, just log if needed
+            console.error("Failed to fetch user profile (likely session ended):", error.message);
+            // Optionally show a less intrusive error message
+            // showApiError(generalErrorDiv, "Could not refresh profile.", "Error");
+        }
+    };
 
 
-  // (Form Submission Handler - Modified for Auth & Credits)
-  songForm.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      if (!currentUser.token) {
-          showApiError(generalErrorDiv, "Please login to generate songs.");
-          loginModal.show();
-          return;
-      }
+    // --- Library Functions ---
+    const loadLibrary = async () => {
+         if (!currentUser.token || !libraryContent || !libraryLoading || !libraryEmpty) return;
 
-      // --- Client-side Credit Check (Basic) ---
-      if (currentUser.credits < 1) { // Assuming cost is 1 credit
-           showApiError(generalErrorDiv, "Insufficient credits. Please purchase more.");
-           // Optional: Redirect to a purchase page/modal
-           return;
-      }
+        libraryLoading.style.display = 'block';
+        libraryEmpty.style.display = 'none';
+        libraryContent.innerHTML = ''; // Clear previous items
 
-      // --- Validation ---
-      let isValid = true;
-      generalErrorDiv.style.display = 'none';
-      workoutErrorDiv.style.display = 'none';
-      toneErrorDiv.style.display = 'none';
-      workoutInput.classList.remove('is-invalid');
-      toneButtonsContainer.classList.remove('is-invalid');
+        try {
+            const songs = await apiRequest('/library/songs', 'GET'); // Requires auth
+            libraryLoading.style.display = 'none';
 
-      if (!workoutInput.value.trim()) {
-          workoutInput.classList.add('is-invalid');
-          workoutErrorDiv.style.display = 'block';
-          isValid = false;
-      }
-      if (!musicStyleInput.value) {
-          toneButtonsContainer.classList.add('is-invalid');
-          toneErrorDiv.style.display = 'block';
-          isValid = false;
-      }
-      if (!isValid) return;
+            if (songs && songs.length > 0) {
+                songs.forEach(renderLibraryItem);
+            } else {
+                libraryEmpty.style.display = 'block';
+            }
+        } catch (error) {
+            libraryLoading.style.display = 'none';
+            // Error handled by apiRequest logout or show general error
+            if (currentUser.token) { // Only show error if user is still supposedly logged in
+                 showApiError(generalErrorDiv, error, "Failed to load library.");
+            }
+        }
+    };
 
-      // --- If valid, proceed ---
-      audioResultContainer.style.display = 'none'; // Hide previous result
-      loadingIndicator.style.display = 'block';
-      loadingMessage.textContent = "Checking credits..."; // Update loading message
-      motivateButton.disabled = true;
+    const renderLibraryItem = (song) => {
+         if (!libraryContent) return;
+         const item = document.createElement('div');
+         item.className = 'list-group-item library-list-item'; // Added base class
+         item.dataset.songId = song.id;
 
-      const workout = workoutInput.value.trim();
-      const musicStyle = musicStyleInput.value;
-      const name = nameInput.value.trim() || ''; // Send empty if not provided
+         const formattedDate = song.created_at ? new Date(song.created_at).toLocaleDateString() : 'N/A';
 
-      try {
-          // NOTE: Backend re-checks and deducts credits before lyric generation.
-          // This is more secure than relying only on the frontend check.
+         let statusOrPlayerHtml = '';
+         switch(song.status) {
+             case 'complete':
+                 statusOrPlayerHtml = song.audio_url
+                    ? `<audio controls src="${song.audio_url}" class="library-audio-player"></audio>`
+                    : `<span class="badge bg-warning text-dark">Complete (No URL)</span>`; // Should not happen
+                 break;
+             case 'processing':
+                 statusOrPlayerHtml = `<span class="badge bg-info text-dark">Processing...</span>`;
+                 break;
+             case 'pending':
+                 statusOrPlayerHtml = `<span class="badge bg-secondary">Pending...</span>`;
+                 break;
+             case 'error':
+             default:
+                 statusOrPlayerHtml = `<span class="badge bg-danger">Error</span>`;
+                 break;
+         }
 
-          // Step 1: Generate Lyrics (Backend handles credit check)
-           loadingMessage.textContent = "Generating lyrics...";
-          const lyricsData = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, name });
-          const lyrics = lyricsData.lyrics;
-          lyricsOutput.textContent = lyrics;
-          console.log("Lyrics generated by backend.");
+         item.innerHTML = `
+            <div class="library-item-info">
+                <h5>${song.title || 'Untitled Song'}</h5>
+                <p>Workout: ${song.workout_input || 'N/A'}<br>Style: ${song.style_input || 'N/A'} | Date: ${formattedDate}</p>
+            </div>
+            <div class="library-item-controls">
+                ${statusOrPlayerHtml}
+                ${song.status !== 'processing' && song.status !== 'pending' ? // Only show delete for final states
+                    `<button class="btn btn-sm btn-outline-danger btn-delete-song" data-song-id="${song.id}" title="Delete Song">X</button>` : ''
+                }
+            </div>
+        `;
+        libraryContent.appendChild(item);
+    };
 
-          // Step 2: Generate Audio (Backend handles credit check/deduction)
-           loadingMessage.textContent = "Submitting audio generation task...";
-           // Pass original inputs along with lyrics for saving to DB
-          const audioSubmitData = await apiRequest('/generate/generate-audio', 'POST', { lyrics, musicStyle, workout, name });
-          const songId = audioSubmitData.songId; // Get the DB song ID
-          const sunoTaskId = audioSubmitData.sunoTaskId; // Get the Suno Task ID
-           currentUser.credits = audioSubmitData.remainingCredits; // Update local credit count
-           creditsDisplay.textContent = currentUser.credits; // Update UI
+     const handleDeleteSong = async (songId) => {
+         if (!libraryContent || !libraryEmpty) return;
+        if (!confirm("Are you sure you want to delete this song? This cannot be undone.")) return;
 
-          console.log(`Audio task submitted. Song ID: ${songId}, Suno Task ID: ${sunoTaskId}`);
+        try {
+            await apiRequest(`/library/songs/${songId}`, 'DELETE'); // Requires auth
+            // Remove item from UI
+            const itemToRemove = libraryContent.querySelector(`.library-list-item[data-song-id="${songId}"]`);
+            if(itemToRemove) itemToRemove.remove();
 
-          // Step 3: Poll for status using Suno Task ID
-          loadingMessage.textContent = "Generating audio (this may take a minute)...";
-          let pollCount = 0;
-          const maxPolls = 40; // Increased polling time (2 minutes)
-          let audioFound = false;
-
-          const pollInterval = setInterval(async () => {
-              pollCount++;
-              if (pollCount > maxPolls) {
-                  clearInterval(pollInterval);
-                  if (!audioFound) {
-                       throw new Error("Audio generation timed out.");
-                  }
-                  return;
-              }
-
-               // console.log(`Polling status for Task ${sunoTaskId} (Attempt ${pollCount})...`);
-              try {
-                  const statusData = await apiRequest(`/generate/song-status/${sunoTaskId}`, 'GET');
-                  // console.log("Poll status response:", statusData);
-
-                  if (statusData.status === 'complete' && statusData.audioUrl) {
-                      audioFound = true;
-                      clearInterval(pollInterval);
-                      console.log("Audio processing complete. URL:", statusData.audioUrl);
-
-                      audioPlayer.src = statusData.audioUrl;
-                      audioResultContainer.style.display = 'block';
-                      loadingIndicator.style.display = 'none';
-                      motivateButton.disabled = false;
-                      audioResultContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                       // Reload library to show the new completed song
-                       if (document.getElementById('libraryTab').classList.contains('active')) {
-                           loadLibrary();
-                       }
-
-                  } else if (statusData.status === 'error') {
-                       audioFound = true; // Consider it 'found' to stop timeout error
-                       clearInterval(pollInterval);
-                       throw new Error(statusData.error || "Audio generation failed during processing.");
-                  } else if (statusData.status === 'processing' || statusData.status === 'pending') {
-                      // Still processing, continue polling
-                       loadingMessage.textContent = `Generating audio... (Attempt ${pollCount}/${maxPolls})`;
-                  } else {
-                      // Unknown status, stop polling to prevent infinite loops
-                       console.warn("Unknown song status received:", statusData);
-                       // clearInterval(pollInterval);
-                       // throw new Error("Received unknown status during polling.");
-                       // Let it continue polling for now, maybe it will resolve
-                  }
-              } catch (pollErr) {
-                  // If polling fails (e.g., 404 before callback), keep polling unless it's auth error
-                   if (pollErr.message.includes("session has expired")) {
-                       clearInterval(pollInterval); // Stop polling if logged out
-                       throw pollErr; // Re-throw auth error
-                   }
-                   console.warn("Polling attempt failed:", pollErr.message);
-                   // Don't stop polling on transient errors
-              }
-          }, 3000); // Poll every 3 seconds
-
-      } catch (err) {
-          console.error("Error during generation process:", err);
-          showApiError(generalErrorDiv, err, "Song generation failed.");
-          loadingIndicator.style.display = 'none';
-          motivateButton.disabled = false;
-           // Attempt to fetch updated profile in case credits changed on backend before error
-           fetchUserProfile();
-      }
-  });
+            // Check if library is now empty
+             if (libraryContent.children.length === 0) {
+                 libraryEmpty.style.display = 'block';
+             }
+             console.log(`Song ${songId} deleted.`);
+        } catch (error) {
+            // Error handled by apiRequest logout or show general error
+             if (currentUser.token) {
+                 showApiError(generalErrorDiv, error, "Failed to delete song.");
+             }
+        }
+    };
 
 
-  // --- Event Listeners ---
-  showLoginBtn.addEventListener('click', () => loginModal.show());
-  showSignupBtn.addEventListener('click', () => signupModal.show());
-  logoutButton.addEventListener('click', handleLogout);
+    // --- Generator Functions ---
+    // Button group handler
+    function handleButtonGroupClick(container, hiddenInput, errorDiv, groupElement) {
+        if (!container || !hiddenInput) return;
+        container.addEventListener('click', function (e) {
+            if (e.target.classList.contains('option-button')) {
+                if(groupElement) groupElement.classList.remove('is-invalid');
+                if(errorDiv) errorDiv.style.display = 'none';
+                container.querySelectorAll('.option-button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                hiddenInput.value = e.target.getAttribute('data-value');
+            }
+      });
+    }
+    handleButtonGroupClick(toneButtonsContainer, musicStyleInput, toneErrorDiv, toneButtonsContainer);
 
-  loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const email = document.getElementById('loginEmail').value;
-      const password = document.getElementById('loginPassword').value;
-      handleLogin(email, password);
-  });
-
-  signupForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const username = document.getElementById('signupUsername').value;
-      const email = document.getElementById('signupEmail').value;
-      const password = document.getElementById('signupPassword').value;
-      const confirmPassword = document.getElementById('signupConfirmPassword').value;
-      handleSignup(username, email, password, confirmPassword);
-  });
-
-   // Listener for tab changes to reload library if needed
-   appTabs.addEventListener('shown.bs.tab', function (event) {
-       if (event.target.getAttribute('href') === '#libraryTab') {
-           loadLibrary(); // Reload library when tab becomes active
-       }
-   });
-
-   // Event delegation for delete buttons in the library
-   libraryContent.addEventListener('click', function(event) {
-      if (event.target.classList.contains('btn-delete-song')) {
-          const songId = event.target.dataset.songId;
-          handleDeleteSong(songId);
-      }
-  });
+    // Text input validation clear
+    if(workoutInput && workoutErrorDiv) {
+        workoutInput.addEventListener('input', () => {
+           workoutInput.classList.remove('is-invalid');
+           workoutErrorDiv.style.display = 'none';
+        });
+    }
 
 
-  // --- Initial Load ---
-  updateUIBasedOnLoginState();
+    // Generator Form Submission Handler
+    if (songForm) {
+        songForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
 
-}); // End DOMContentLoaded
+            // Ensure all required elements exist before proceeding
+            if (!workoutInput || !musicStyleInput || !motivateButton || !loadingIndicator || !loadingMessage ||
+                !generalErrorDiv || !workoutErrorDiv || !toneErrorDiv || !audioResultContainer || !lyricsOutput || !audioPlayer ) {
+                console.error("Generator form elements missing. Aborting.");
+                showApiError(generalErrorDiv || document.body, "UI Error: Form elements missing.", "Error");
+                return;
+            }
+
+
+            // 1. Check Login State (via token presence)
+            if (!currentUser.token) {
+                showApiError(generalErrorDiv, "Please login to generate songs.");
+                if (loginModalInstance) loginModalInstance.show();
+                return;
+            }
+
+            // 2. Client-side Credit Check (Basic - Backend verifies authoritatively)
+            const CREDITS_PER_SONG = 1; // Make this consistent with backend if logic changes
+            if (currentUser.credits < CREDITS_PER_SONG) {
+                 showApiError(generalErrorDiv, `Insufficient credits. Generating a song costs ${CREDITS_PER_SONG} credit.`);
+                 return;
+            }
+
+            // 3. Form Validation
+            let isValid = true;
+            generalErrorDiv.style.display = 'none';
+            workoutErrorDiv.style.display = 'none';
+            toneErrorDiv.style.display = 'none';
+            workoutInput.classList.remove('is-invalid');
+            if(toneButtonsContainer) toneButtonsContainer.classList.remove('is-invalid');
+
+            if (!workoutInput.value.trim()) {
+                workoutInput.classList.add('is-invalid');
+                workoutErrorDiv.style.display = 'block';
+                isValid = false;
+            }
+            if (!musicStyleInput.value) {
+                if(toneButtonsContainer) toneButtonsContainer.classList.add('is-invalid');
+                toneErrorDiv.style.display = 'block';
+                isValid = false;
+            }
+            if (!isValid) return;
+
+            // --- If valid, proceed ---
+            audioResultContainer.style.display = 'none';
+            loadingIndicator.style.display = 'block';
+            loadingMessage.textContent = "Preparing generation...";
+            motivateButton.disabled = true;
+            motivateButton.textContent = "GENERATING..."; // Update button text
+
+            const workout = workoutInput.value.trim();
+            const musicStyle = musicStyleInput.value;
+            const name = nameInput ? nameInput.value.trim() : ''; // Handle optional name input
+
+            let pollInterval; // Declare interval variable in wider scope
+
+            try {
+                // Step 1: Generate Lyrics (Backend handles credit check)
+                loadingMessage.textContent = "Generating lyrics...";
+                const lyricsData = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, name }); // Requires auth implicitly via apiRequest
+                const lyrics = lyricsData.lyrics;
+                lyricsOutput.textContent = lyrics;
+                console.log("Lyrics generation initiated by backend.");
+
+                // Step 2: Generate Audio (Backend handles credit deduction)
+                loadingMessage.textContent = "Submitting audio generation task...";
+                const audioSubmitData = await apiRequest('/generate/generate-audio', 'POST', { lyrics, musicStyle, workout, name }); // Requires auth
+                const songId = audioSubmitData.songId;
+                const sunoTaskId = audioSubmitData.sunoTaskId;
+                currentUser.credits = audioSubmitData.remainingCredits; // Update local credit count
+                 if(creditsDisplay) creditsDisplay.textContent = currentUser.credits; // Update UI
+
+                console.log(`Audio task submitted. Song ID: ${songId}, Suno Task ID: ${sunoTaskId}`);
+
+                // Step 3: Poll for status using Suno Task ID
+                loadingMessage.textContent = "Generating audio (this may take a minute)...";
+                let pollCount = 0;
+                const maxPolls = 45; // Poll for ~2.25 minutes
+                let audioFound = false;
+
+                pollInterval = setInterval(async () => {
+                    pollCount++;
+                    if (pollCount > maxPolls) {
+                        clearInterval(pollInterval);
+                        if (!audioFound) {
+                             throw new Error("Audio generation timed out. Please check your library later.");
+                        }
+                        return; // Exit polling
+                    }
+
+                    try {
+                        // Poll specific endpoint
+                        const statusData = await apiRequest(`/generate/song-status/${sunoTaskId}`, 'GET'); // Requires auth
+
+                        if (statusData.status === 'complete' && statusData.audioUrl) {
+                            audioFound = true;
+                            clearInterval(pollInterval);
+                            console.log("Audio processing complete. URL:", statusData.audioUrl);
+
+                            audioPlayer.src = statusData.audioUrl;
+                            audioResultContainer.style.display = 'block';
+                            loadingIndicator.style.display = 'none';
+                            motivateButton.disabled = false;
+                            motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`; // Reset button text
+                            audioResultContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                             // Reload library IF the library tab is currently active
+                            const libraryTabLink = document.querySelector('a[href="#libraryTab"]');
+                            if (libraryTabLink && libraryTabLink.classList.contains('active')) {
+                                loadLibrary();
+                            }
+
+                        } else if (statusData.status === 'error') {
+                             audioFound = true; // Consider error as 'found' to stop timeout message
+                             clearInterval(pollInterval);
+                             throw new Error(statusData.error || "Audio generation failed during processing.");
+
+                        } else if (statusData.status === 'processing' || statusData.status === 'pending') {
+                            // Still processing, update message and continue polling
+                            loadingMessage.textContent = `Generating audio... (${Math.round((pollCount/maxPolls)*100)}%)`;
+                        } else if (statusData.status === 'not_found') {
+                             console.warn(`Polling: Song status not found for task ${sunoTaskId}. Might be too early or an issue.`);
+                             loadingMessage.textContent = `Generation initiated... waiting for status update...`;
+                        } else {
+                            // Unknown status - log but keep polling for a bit
+                             console.warn("Unknown song status received:", statusData);
+                             loadingMessage.textContent = `Waiting for status... (${pollCount}/${maxPolls})`;
+                        }
+                    } catch (pollErr) {
+                        // Handle errors during the polling request itself
+                        if (pollErr.message.includes("session has expired")) {
+                             // If token expires during polling, stop polling and let error bubble up
+                             clearInterval(pollInterval);
+                             throw pollErr; // Re-throw auth error
+                        }
+                        // Log other polling errors but continue polling unless max attempts reached
+                        console.warn(`Polling attempt ${pollCount} failed: ${pollErr.message}. Continuing poll...`);
+                    }
+                }, 3000); // Poll every 3 seconds
+
+            } catch (err) {
+                // Catch errors from lyrics gen, audio submit, or polling timeout/failure
+                console.error("Error during generation process:", err);
+                showApiError(generalErrorDiv, err, "Song generation failed."); // Show user-friendly error
+                if(pollInterval) clearInterval(pollInterval); // Ensure polling stops on error
+                loadingIndicator.style.display = 'none';
+                motivateButton.disabled = false;
+                motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`; // Reset button text
+                // Attempt to fetch updated profile in case credits changed on backend before error
+                fetchUserProfile();
+            }
+        }); // End songForm submit listener
+    } // End if(songForm)
+
+
+    // --- Event Listeners Setup ---
+    if(showLoginBtn && loginModalInstance) {
+        showLoginBtn.addEventListener('click', () => loginModalInstance.show());
+    }
+    if(showSignupBtn && signupModalInstance) {
+        showSignupBtn.addEventListener('click', () => signupModalInstance.show());
+    }
+    if(logoutButton) {
+        logoutButton.addEventListener('click', handleLogout);
+    }
+    if(loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const emailInput = document.getElementById('loginEmail');
+            const passwordInput = document.getElementById('loginPassword');
+            if (emailInput && passwordInput) {
+                 handleLogin(emailInput.value, passwordInput.value);
+            }
+        });
+    }
+    if(signupForm) {
+        signupForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const userInput = document.getElementById('signupUsername');
+            const emailInput = document.getElementById('signupEmail');
+            const passInput = document.getElementById('signupPassword');
+            const confirmInput = document.getElementById('signupConfirmPassword');
+            if(userInput && emailInput && passInput && confirmInput) {
+                 handleSignup(userInput.value, emailInput.value, passInput.value, confirmInput.value);
+            }
+        });
+    }
+
+     // Listener for tab changes to reload library if needed and if library exists
+     if (appTabs && libraryContent) {
+         appTabs.addEventListener('shown.bs.tab', function (event) {
+             if (event.target.getAttribute('href') === '#libraryTab') {
+                 loadLibrary(); // Reload library when tab becomes active
+             }
+         });
+     }
+
+     // Event delegation for delete buttons in the library if library exists
+     if (libraryContent) {
+         libraryContent.addEventListener('click', function(event) {
+            // Find the closest button with the delete class
+            const deleteButton = event.target.closest('.btn-delete-song');
+            if (deleteButton) {
+                const songId = deleteButton.dataset.songId;
+                 if (songId) {
+                     handleDeleteSong(songId);
+                 }
+            }
+        });
+    }
+
+
+    // --- Initial Load ---
+    updateUIBasedOnLoginState();
+
+}); // End DOMContentLoaded Wrapper
