@@ -20,26 +20,16 @@ app.use(express.json()); // For parsing application/json
 app.use(express.urlencoded({ extended: true })); // If using callbacks via form post
 
 // Special handling for Stripe webhooks
+// Note: Ensure this path matches your Stripe webhook configuration if it's different
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
-// --- Static Files ---
-// Serve frontend files (HTML, CSS, JS, images) from the parent directory
-app.use(express.static(path.join(__dirname, '..')));
-
 // --- API Routes ---
+// Vercel handles serving static files (index.html, etc.) from the root.
+// Express only needs to handle the API endpoints.
 app.use('/api/auth', authRoutes);
 app.use('/api/generate', generateRoutes); // Prefix generate routes
 app.use('/api/library', libraryRoutes);  // Prefix library routes
 app.use('/api/stripe', stripeRoutes);    // Add Stripe routes
-
-// --- Serve index.html for the root path and potentially other frontend routes ---
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'index.html'));
-});
-// Add more frontend routes here if using client-side routing (e.g., React Router)
-// app.get('/login', (req, res) => { ... });
-// app.get('/library', (req, res) => { ... });
-
 
 // --- Simple Health Check ---
 app.get('/api/health', (req, res) => {
