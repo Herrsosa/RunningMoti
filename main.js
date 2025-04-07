@@ -55,10 +55,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-    // --- API Endpoints (Using config.js if available, otherwise default) ---
-    // Assuming config.js defines BACKEND_API_ENDPOINT like:
-    // const BACKEND_API_ENDPOINT = 'http://localhost:5000/api';
-    const BASE_API_URL = typeof BACKEND_API_ENDPOINT !== 'undefined' ? BACKEND_API_ENDPOINT : 'http://localhost:5000/api';
+// --- API Endpoints ---
+// Use a relative path for API requests. This works both locally (if backend is proxied)
+// and when deployed on Vercel, as Vercel routes /api to the backend function.
+const BASE_API_URL = '/api';
 
 
     // --- Utility Functions ---
