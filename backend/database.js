@@ -4,16 +4,34 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 
 const dbPath = path.resolve(__dirname, 'database.sqlite');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error("Error opening database", err.message);
-    } else {
-        console.log("Connected to the SQLite database.");
-        initializeDatabase();
-    }
-});
+let db = null; // Initialize db as null
+let dbInitializationError = null; // Store potential error
+
+try {
+    db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+            dbInitializationError = `FATAL: Error opening SQLite database at ${dbPath}: ${err.message}. SQLite is likely incompatible with this serverless environment's filesystem.`;
+            console.error(dbInitializationError);
+            db = null; // Ensure db remains null on error
+        } else {
+            console.log("Connected to the SQLite database.");
+            initializeDatabase(); // Proceed only if connection successful
+        }
+    });
+} catch (syncErr) {
+    // Catch synchronous errors during constructor/setup if any
+    dbInitializationError = `FATAL: Synchronous error initializing SQLite database: ${syncErr.message}.`;
+    console.error(dbInitializationError);
+    db = null;
+}
+
 
 const initializeDatabase = () => {
+    // This function should only be called if db connection was successful
+    if (!db) {
+        console.error("Skipping database initialization because connection failed.");
+        return;
+    }
     db.serialize(() => {
         // Users Table - ADDED is_verified, verification_token, verification_token_expires
         db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -110,4 +128,6 @@ const comparePassword = async (password, hash) => {
     }
 };
 
-module.exports = { db, hashPassword, comparePassword };
+// Export the db object (which might be null) and functions
+// Also export the error state for potential checks elsewhere (optional)
+module.exports = { db, dbInitializationError, hashPassword, comparePassword };
