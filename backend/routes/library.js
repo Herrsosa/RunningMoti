@@ -1,71 +1,83 @@
 // backend/routes/library.js
 const express = require('express');
-const { db } = require('../database');
+// Import the new query function
+const { query } = require('../database');
 const verifyToken = require('../middleware/authMiddleware');
 const router = express.Router();
 
-// Get User Profile (Username & Credits)
-router.get('/profile', verifyToken, (req, res) => {
+// Get User Profile (Username & Credits) - REFACTORED for PostgreSQL
+router.get('/profile', verifyToken, async (req, res) => { // Make async
     const userId = req.userId;
-    const sql = "SELECT username, credits FROM users WHERE id = ?";
+    const sql = "SELECT username, credits FROM users WHERE id = $1"; // Use $1
 
-    db.get(sql, [userId], (err, user) => {
-        if (err) {
-            console.error("Error fetching profile:", err);
-            return res.status(500).json({ error: "Database error fetching profile." });
-        }
+    try {
+        const result = await query(sql, [userId]);
+        const user = result.rows[0]; // Get first row
+
         if (!user) {
             return res.status(404).json({ error: "User not found." });
         }
         res.json(user);
-    });
+    } catch (err) {
+        console.error("Error fetching profile:", err);
+        return res.status(500).json({ error: "Database error fetching profile." });
+    }
 });
 
 
-// Get User's Song Library
-router.get('/songs', verifyToken, (req, res) => {
+// Get User's Song Library - REFACTORED for PostgreSQL
+router.get('/songs', verifyToken, async (req, res) => { // Make async
     const userId = req.userId;
-    // Fetch songs, newest first, exclude pending/processing? Or include with status?
-    // Let's include all for now, frontend can filter display if needed
-    const sql = `SELECT id, title, workout_input, style_input, audio_url, status, created_at
-                 FROM songs
-                 WHERE user_id = ?
-                 ORDER BY created_at DESC`;
+    const sql = `
+        SELECT id, title, workout_input, style_input, audio_url, status, created_at
+        FROM songs
+        WHERE user_id = $1
+        ORDER BY created_at DESC`; // Use $1
 
-    db.all(sql, [userId], (err, songs) => {
-        if (err) {
-            console.error("Error fetching library:", err);
-            return res.status(500).json({ error: "Database error fetching library." });
-        }
-        res.json(songs || []); // Return empty array if no songs
-    });
+    try {
+        const result = await query(sql, [userId]);
+        res.json(result.rows || []); // Return rows (already an array) or empty array
+    } catch (err) {
+        console.error("Error fetching library:", err);
+        return res.status(500).json({ error: "Database error fetching library." });
+    }
 });
 
 
-// Optional: Delete a song (Example)
-router.delete('/songs/:songId', verifyToken, (req, res) => {
+// Optional: Delete a song - REFACTORED for PostgreSQL
+router.delete('/songs/:songId', verifyToken, async (req, res) => { // Make async
     const userId = req.userId;
     const songId = req.params.songId;
 
-    // Verify user owns the song before deleting
-     db.get("SELECT user_id FROM songs WHERE id = ?", [songId], (err, song) => {
-         if (err) return res.status(500).json({ error: "Database error" });
-         if (!song) return res.status(404).json({ error: "Song not found" });
-         if (song.user_id !== userId) return res.status(403).json({ error: "Forbidden" });
+    try {
+        // Verify user owns the song before deleting
+        const checkSql = "SELECT user_id FROM songs WHERE id = $1"; // Use $1
+        const checkResult = await query(checkSql, [songId]);
+        const song = checkResult.rows[0];
 
-         // Proceed with deletion
-         db.run("DELETE FROM songs WHERE id = ?", [songId], function(err) {
-             if (err) {
-                 console.error("Error deleting song:", err);
-                 return res.status(500).json({ error: "Failed to delete song." });
-             }
-             if (this.changes === 0) {
-                  return res.status(404).json({ error: "Song not found" }); // Should not happen if previous check passed
-             }
-             res.sendStatus(204); // No Content success
-         });
-     });
+        if (!song) {
+            return res.status(404).json({ error: "Song not found" });
+        }
+        if (song.user_id !== userId) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+
+        // Proceed with deletion
+        const deleteSql = "DELETE FROM songs WHERE id = $1"; // Use $1
+        const deleteResult = await query(deleteSql, [songId]);
+
+        if (deleteResult.rowCount === 0) {
+            // Should not happen if previous check passed, but good safeguard
+            console.warn(`Attempted to delete song ID ${songId} but no rows were affected.`);
+            return res.status(404).json({ error: "Song not found during delete operation" });
+        }
+
+        res.sendStatus(204); // No Content success
+
+    } catch (err) {
+        console.error(`Error deleting song ID ${songId}:`, err);
+        return res.status(500).json({ error: "Failed to delete song." });
+    }
 });
-
 
 module.exports = router;

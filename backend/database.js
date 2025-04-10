@@ -1,103 +1,125 @@
 // backend/database.js
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
-const dbPath = path.resolve(__dirname, 'database.sqlite');
-let db = null; // Initialize db as null
-let dbInitializationError = null; // Store potential error
+// Vercel automatically sets POSTGRES_URL environment variable
+// when the database is connected to the project.
+const connectionString = process.env.POSTGRES_URL;
 
-try {
-    db = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-            dbInitializationError = `FATAL: Error opening SQLite database at ${dbPath}: ${err.message}. SQLite is likely incompatible with this serverless environment's filesystem.`;
-            console.error(dbInitializationError);
-            db = null; // Ensure db remains null on error
-        } else {
-            console.log("Connected to the SQLite database.");
-            initializeDatabase(); // Proceed only if connection successful
-        }
-    });
-} catch (syncErr) {
-    // Catch synchronous errors during constructor/setup if any
-    dbInitializationError = `FATAL: Synchronous error initializing SQLite database: ${syncErr.message}.`;
-    console.error(dbInitializationError);
-    db = null;
+if (!connectionString) {
+    console.error("FATAL: POSTGRES_URL environment variable is not set.");
+    console.error("Ensure the Vercel Postgres/Neon database is connected to the project in the Vercel dashboard.");
+    // Optionally, exit or prevent server start if critical
+    // process.exit(1);
 }
 
+// Create a connection pool
+const pool = new Pool({
+    connectionString: connectionString,
+    // Recommended settings for Vercel Serverless Functions
+    // Adjust max/idleTimeoutMillis based on expected load and Vercel plan limits
+    max: 10, // Max number of clients in the pool
+    idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
+    connectionTimeoutMillis: 20000, // How long to wait for a connection attempt to succeed
+    ssl: connectionString ? { rejectUnauthorized: false } : false // Required for Vercel Postgres/Neon
+});
 
-const initializeDatabase = () => {
-    // This function should only be called if db connection was successful
-    if (!db) {
-        console.error("Skipping database initialization because connection failed.");
-        return;
+pool.on('connect', () => {
+    console.log('Connected to PostgreSQL database via pool.');
+});
+
+pool.on('error', (err, client) => {
+    console.error('Unexpected error on idle client', err);
+    // process.exit(-1); // Consider if errors are fatal
+});
+
+// --- Database Initialization ---
+const initializeDatabase = async () => {
+    console.log("Checking/Initializing database schema...");
+    const client = await pool.connect();
+    try {
+        // Use IF NOT EXISTS for idempotency
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                credits INTEGER DEFAULT 5 NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                is_verified BOOLEAN DEFAULT FALSE NOT NULL,
+                verification_token TEXT,
+                verification_token_expires TIMESTAMPTZ
+            );
+        `);
+        console.log("Users table checked/created.");
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS songs (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workout_input TEXT,
+                style_input TEXT,
+                name_input TEXT,
+                lyrics TEXT,
+                suno_task_id TEXT UNIQUE,
+                audio_url TEXT,
+                title TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log("Songs table checked/created.");
+
+        // Add columns if they don't exist (Postgres version)
+        await addColumnIfNotExistsPg(client, 'users', 'is_verified', 'BOOLEAN DEFAULT FALSE NOT NULL');
+        await addColumnIfNotExistsPg(client, 'users', 'verification_token', 'TEXT');
+        await addColumnIfNotExistsPg(client, 'users', 'verification_token_expires', 'TIMESTAMPTZ');
+
+        console.log("Database schema initialization complete.");
+
+    } catch (err) {
+        console.error("Error initializing database schema:", err);
+        // Depending on the error, you might want to exit or handle differently
+    } finally {
+        client.release(); // Release the client back to the pool
     }
-    db.serialize(() => {
-        // Users Table - ADDED is_verified, verification_token, verification_token_expires
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            credits INTEGER DEFAULT 5 NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            is_verified BOOLEAN DEFAULT 0 NOT NULL,
-            verification_token TEXT,
-            verification_token_expires DATETIME
-        )`, (err) => {
-            if (err) console.error("Error creating/altering users table", err);
-            else console.log("Users table checked/created.");
-            // NOTE: In production, you'd use migration tools for schema changes
-            // For development with SQLite, sometimes you might need to delete the .sqlite file
-            // if you drastically change the schema AFTER it was already created.
-             // Add columns if they don't exist (safer than dropping table)
-            addColumnIfNotExists('users', 'is_verified', 'BOOLEAN DEFAULT 0 NOT NULL');
-            addColumnIfNotExists('users', 'verification_token', 'TEXT');
-            addColumnIfNotExists('users', 'verification_token_expires', 'DATETIME');
-        });
-
-        // Songs Table (Keep as is)
-        db.run(`CREATE TABLE IF NOT EXISTS songs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            workout_input TEXT, style_input TEXT, name_input TEXT, lyrics TEXT,
-            suno_task_id TEXT UNIQUE, audio_url TEXT, title TEXT,
-            status TEXT DEFAULT 'pending',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-        )`, (err) => {
-            if (err) console.error("Error creating songs table", err);
-             else console.log("Songs table checked/created.");
-        });
-    });
 };
 
-// Helper function to add columns without error if they exist
-const addColumnIfNotExists = (tableName, columnName, columnDefinition) => {
-    // Use db.all to get info for ALL columns, not just the first one
-    db.all(`PRAGMA table_info(${tableName})`, (err, results) => {
-        if (err) {
-            console.error(`Error getting table info for ${tableName}:`, err);
-            return;
+// Helper function for Postgres to add columns if they don't exist
+const addColumnIfNotExistsPg = async (client, tableName, columnName, columnDefinition) => {
+    try {
+        const res = await client.query(`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = $1
+              AND column_name = $2;
+        `, [tableName, columnName]);
+
+        if (res.rowCount === 0) {
+            await client.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
+            console.log(`Column ${columnName} added to ${tableName}.`);
         }
-        // PRAGMA table_info returns an array of objects, one for each column
-        // Need to check if any object in the array has a 'name' property equal to columnName
-        if (Array.isArray(results)) {
-             if (!results.some(column => column.name === columnName)) {
-                db.run(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`, (alterErr) => {
-                    if (alterErr) console.error(`Error adding column ${columnName} to ${tableName}:`, alterErr);
-                    else console.log(`Column ${columnName} added to ${tableName}.`);
-                });
-            }
-        } else {
-             console.error(`Unexpected result format for PRAGMA table_info(${tableName}):`, results);
+    } catch (err) {
+        // Ignore errors like "column already exists" if running concurrently,
+        // but log others. Check error code/message if needed for robustness.
+        if (!err.message.includes('already exists')) {
+             console.error(`Error checking/adding column ${columnName} to ${tableName}:`, err);
         }
-    });
+    }
 };
 
+// Call initialization function - runs once when the module is loaded
+initializeDatabase().catch(err => {
+    console.error("Failed to initialize database on startup:", err);
+    // Consider exiting if DB init is critical for server start
+    // process.exit(1);
+});
 
-// --- Password Hashing ---
-const SALT_ROUNDS = 10; // Standard practice, adjust if needed
+
+// --- Password Hashing (Keep as is) ---
+const SALT_ROUNDS = 10;
 
 const hashPassword = async (password) => {
     if (!password) {
@@ -109,13 +131,12 @@ const hashPassword = async (password) => {
         return hash;
     } catch (error) {
         console.error("Error hashing password:", error);
-        throw new Error("Failed to hash password."); // Propagate error
+        throw new Error("Failed to hash password.");
     }
 };
 
 const comparePassword = async (password, hash) => {
     if (!password || !hash) {
-        // Avoid bcrypt error with empty inputs, return false directly
         return false;
     }
     try {
@@ -123,11 +144,27 @@ const comparePassword = async (password, hash) => {
         return match;
     } catch (error) {
         console.error("Error comparing password:", error);
-        // Treat comparison errors as non-match for security
         return false;
     }
 };
 
-// Export the db object (which might be null) and functions
-// Also export the error state for potential checks elsewhere (optional)
-module.exports = { db, dbInitializationError, hashPassword, comparePassword };
+// --- Export Query Function and Hashing Utils ---
+// Export a function to execute queries using the pool, handling client release
+const query = async (text, params) => {
+    const start = Date.now();
+    const client = await pool.connect();
+    try {
+        const res = await client.query(text, params);
+        const duration = Date.now() - start;
+        // console.log('Executed query', { text, duration, rows: res.rowCount }); // Optional logging
+        return res;
+    } finally {
+        client.release(); // Ensure client is always released
+    }
+};
+
+module.exports = {
+    query, // Use this function for all database interactions
+    hashPassword,
+    comparePassword
+};
