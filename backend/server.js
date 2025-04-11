@@ -3,7 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') }); // Explicitly set path
-// process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // Avoid if possible, better to configure certs
+
+// --- Import Database Initialization ---
+const { initializeDatabase } = require('./database'); // Import the init function
 
 // --- Import Routes ---
 const authRoutes = require('./routes/auth');
@@ -49,9 +51,30 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  if (!process.env.JWT_SECRET || !process.env.OPENAI_API_KEY || !process.env.SUNO_API_KEY) {
-      console.warn("⚠️ WARNING: Ensure JWT_SECRET, OPENAI_API_KEY, SUNO_API_KEY (and others) are set in your .env file!");
+// --- Start Server Function ---
+// Wrap in an async function to allow awaiting DB initialization
+const startServer = async () => {
+  try {
+    // Ensure database schema is initialized before starting the server
+    await initializeDatabase();
+    console.log("Database initialization check complete. Starting server...");
+
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+      // Check for essential env vars after successful start
+      if (!process.env.JWT_SECRET || !process.env.OPENAI_API_KEY || !process.env.SUNO_API_KEY) {
+          console.warn("⚠️ WARNING: Ensure JWT_SECRET, OPENAI_API_KEY, SUNO_API_KEY (and others) are set in your .env file!");
+      }
+       if (!process.env.POSTGRES_URL) {
+           console.error("❌ FATAL: POSTGRES_URL environment variable is missing!");
+       }
+    });
+
+  } catch (error) {
+    console.error("❌ FATAL: Failed to initialize database or start server:", error);
+    process.exit(1); // Exit if critical initialization fails
   }
-});
+};
+
+// --- Run the Server ---
+startServer();

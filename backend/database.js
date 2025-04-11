@@ -2,43 +2,41 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
-// Vercel automatically sets POSTGRES_URL environment variable
-// when the database is connected to the project.
 const connectionString = process.env.POSTGRES_URL;
 
 if (!connectionString) {
     console.error("FATAL: POSTGRES_URL environment variable is not set.");
     console.error("Ensure the Vercel Postgres/Neon database is connected to the project in the Vercel dashboard.");
-    // Optionally, exit or prevent server start if critical
-    // process.exit(1);
+    // In a real app, you might throw an error here to prevent startup
 }
 
 // Create a connection pool
 const pool = new Pool({
     connectionString: connectionString,
-    // Recommended settings for Vercel Serverless Functions
-    // Adjust max/idleTimeoutMillis based on expected load and Vercel plan limits
-    max: 10, // Max number of clients in the pool
-    idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-    connectionTimeoutMillis: 20000, // How long to wait for a connection attempt to succeed
-    ssl: connectionString ? { rejectUnauthorized: false } : false // Required for Vercel Postgres/Neon
+    // Increase timeouts slightly for serverless environments
+    max: 10,
+    idleTimeoutMillis: 40000, // Increased
+    connectionTimeoutMillis: 30000, // Increased
+    // Remove insecure SSL setting - Vercel/Neon connection strings handle SSL
 });
 
 pool.on('connect', () => {
-    console.log('Connected to PostgreSQL database via pool.');
+    console.log('DB Pool: Connection established.');
 });
 
 pool.on('error', (err, client) => {
-    console.error('Unexpected error on idle client', err);
-    // process.exit(-1); // Consider if errors are fatal
+    console.error('DB Pool: Unexpected error on idle client', err);
 });
 
-// --- Database Initialization ---
+// --- Database Initialization Function ---
+// We will call this explicitly from server.js before starting the server
 const initializeDatabase = async () => {
-    console.log("Checking/Initializing database schema...");
-    const client = await pool.connect();
+    console.log("Attempting database schema initialization...");
+    let client; // Define client outside try block for finally scope
     try {
-        // Use IF NOT EXISTS for idempotency
+        client = await pool.connect();
+        console.log("DB Init: Client connected.");
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -52,7 +50,7 @@ const initializeDatabase = async () => {
                 verification_token_expires TIMESTAMPTZ
             );
         `);
-        console.log("Users table checked/created.");
+        console.log("DB Init: Users table checked/created.");
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS songs (
@@ -69,20 +67,25 @@ const initializeDatabase = async () => {
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log("Songs table checked/created.");
+        console.log("DB Init: Songs table checked/created.");
 
         // Add columns if they don't exist (Postgres version)
         await addColumnIfNotExistsPg(client, 'users', 'is_verified', 'BOOLEAN DEFAULT FALSE NOT NULL');
         await addColumnIfNotExistsPg(client, 'users', 'verification_token', 'TEXT');
         await addColumnIfNotExistsPg(client, 'users', 'verification_token_expires', 'TIMESTAMPTZ');
 
-        console.log("Database schema initialization complete.");
+        console.log("Database schema initialization successful.");
+        return true; // Indicate success
 
     } catch (err) {
-        console.error("Error initializing database schema:", err);
-        // Depending on the error, you might want to exit or handle differently
+        console.error("FATAL: Error initializing database schema:", err);
+        // Throw the error so server.js knows initialization failed
+        throw err;
     } finally {
-        client.release(); // Release the client back to the pool
+        if (client) {
+            client.release(); // Release the client back to the pool
+            console.log("DB Init: Client released.");
+        }
     }
 };
 
@@ -99,72 +102,63 @@ const addColumnIfNotExistsPg = async (client, tableName, columnName, columnDefin
 
         if (res.rowCount === 0) {
             await client.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
-            console.log(`Column ${columnName} added to ${tableName}.`);
+            console.log(`DB Init Helper: Column ${columnName} added to ${tableName}.`);
+        } else {
+             // console.log(`DB Init Helper: Column ${columnName} already exists in ${tableName}.`);
         }
     } catch (err) {
-        // Ignore errors like "column already exists" if running concurrently,
-        // but log others. Check error code/message if needed for robustness.
         if (!err.message.includes('already exists')) {
-             console.error(`Error checking/adding column ${columnName} to ${tableName}:`, err);
+             console.error(`DB Init Helper: Error checking/adding column ${columnName} to ${tableName}:`, err);
+             throw err; // Re-throw significant errors
+        } else {
+             // console.log(`DB Init Helper: Column ${columnName} already exists (concurrent add attempt?).`);
         }
     }
 };
 
-// Call initialization function - runs once when the module is loaded
-initializeDatabase().catch(err => {
-    console.error("Failed to initialize database on startup:", err);
-    // Consider exiting if DB init is critical for server start
-    // process.exit(1);
-});
-
-
 // --- Password Hashing (Keep as is) ---
 const SALT_ROUNDS = 10;
-
 const hashPassword = async (password) => {
-    if (!password) {
-        throw new Error("Password cannot be empty");
-    }
+    if (!password) throw new Error("Password cannot be empty");
     try {
         const salt = await bcrypt.genSalt(SALT_ROUNDS);
-        const hash = await bcrypt.hash(password, salt);
-        return hash;
+        return await bcrypt.hash(password, salt);
     } catch (error) {
         console.error("Error hashing password:", error);
         throw new Error("Failed to hash password.");
     }
 };
-
 const comparePassword = async (password, hash) => {
-    if (!password || !hash) {
-        return false;
-    }
+    if (!password || !hash) return false;
     try {
-        const match = await bcrypt.compare(password, hash);
-        return match;
+        return await bcrypt.compare(password, hash);
     } catch (error) {
         console.error("Error comparing password:", error);
         return false;
     }
 };
 
-// --- Export Query Function and Hashing Utils ---
-// Export a function to execute queries using the pool, handling client release
+// --- Export Query Function, Hashing Utils, and Initialization Function ---
 const query = async (text, params) => {
     const start = Date.now();
-    const client = await pool.connect();
+    let client;
     try {
+        client = await pool.connect();
         const res = await client.query(text, params);
         const duration = Date.now() - start;
-        // console.log('Executed query', { text, duration, rows: res.rowCount }); // Optional logging
+        // console.log('Executed query', { text, params, duration, rows: res.rowCount });
         return res;
+    } catch (err) {
+         console.error('Database query error', { text, params, error: err });
+         throw err; // Re-throw error for route handlers to catch
     } finally {
-        client.release(); // Ensure client is always released
+        if (client) client.release();
     }
 };
 
 module.exports = {
-    query, // Use this function for all database interactions
+    query,
+    initializeDatabase, // Export the init function
     hashPassword,
     comparePassword
 };
