@@ -35,8 +35,8 @@ router.post('/generate-lyrics', verifyToken, async (req, res) => {
     try {
         const { workout, musicStyle, name } = req.body;
 
-        // *** OpenAI API Call - No changes needed here ***
-        const response = await axios.post(process.env.OPENAI_API_ENDPOINT, {
+        // *** OpenAI API Call - Add timeout ***
+        const openAiPayload = {
             model: "gpt-4", // Or your preferred model
             messages: [{
                 role: "user",
@@ -56,19 +56,45 @@ Structure the song with:
 Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, and worthy of a true champion. This is a lyrical war cry — something that gets in their head and fuels their performance.`
             }],
             temperature: 0.7
-        }, {
+        };
+        const openAiConfig = {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-            }
-        });
+            },
+            timeout: 8000 // 8 seconds timeout
+        };
+
+        let response;
+        try {
+             console.log("Requesting lyrics from OpenAI...");
+             response = await axios.post(process.env.OPENAI_API_ENDPOINT, openAiPayload, openAiConfig);
+             console.log("Received lyrics response from OpenAI.");
+        } catch (axiosError) {
+             if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
+                 console.error(`OpenAI API call timed out after ${openAiConfig.timeout}ms.`);
+                 // Return a specific error indicating the timeout for lyrics generation
+                 return res.status(504).json({ error: 'Lyric generation timed out. Please try again.' });
+             } else {
+                 // Re-throw other Axios errors
+                 console.error('OpenAI API request failed:', axiosError.response ? axiosError.response.data : axiosError.message);
+                 throw new Error(`OpenAI API request failed: ${axiosError.message}`); // Let the main catch block handle it
+             }
+        }
+
+        // Ensure response and expected data structure exist before accessing
+        if (!response?.data?.choices?.[0]?.message?.content) {
+             console.error('Invalid or unexpected response structure from OpenAI:', response?.data);
+             throw new Error('Invalid response received from lyric generation service.');
+        }
 
         const lyrics = response.data.choices[0].message.content.trim();
         res.json({ lyrics }); // Send lyrics back
 
     } catch (error) {
-        console.error('Error generating lyrics:', error.response ? error.response.data : error.message);
-        res.status(500).json({ error: 'Failed to generate lyrics' });
+        // This catch block now handles non-timeout errors from the OpenAI call or other logic errors
+        console.error('Error in /generate-lyrics route:', error.message);
+        res.status(500).json({ error: error.message || 'Failed to generate lyrics' });
     }
 });
 
