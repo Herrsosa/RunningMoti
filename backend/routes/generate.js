@@ -111,40 +111,77 @@ router.post('/generate-audio', verifyToken, async (req, res) => {
         console.log(`Initial song record created with ID: ${songId}`);
 
         // --- Initiate Suno Generation ---
-        // *** Suno API Call - No changes needed here, assuming callback includes songId ***
+        // *** Suno API Call - Add timeout and specific error handling ***
         const callbackUrl = `${process.env.SUNO_CALLBACK_URL}?songId=${songId}`;
-        const sunoResponse = await axios.post(process.env.SUNO_API_ENDPOINT, {
+        let sunoResponse;
+        const sunoRequestConfig = {
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUNO_API_KEY}` },
+            timeout: 8000 // 8 seconds timeout
+        };
+        const sunoPayload = {
             customMode: true, instrumental: false, model: "V3_5",
             style: musicStyle.slice(0, 200), title: defaultTitle.slice(0, 80),
             prompt: lyrics.slice(0, 3000), callBackUrl: callbackUrl
-        }, {
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUNO_API_KEY}` }
-        });
-        console.log("Suno API initial response:", sunoResponse.data);
+        };
 
-        // Extract Suno Task ID
-        const sunoTaskId = sunoResponse.data?.data?.taskId || sunoResponse.data?.taskId || null;
+        try {
+            console.log(`Submitting job to Suno for song ${songId}...`);
+            sunoResponse = await axios.post(process.env.SUNO_API_ENDPOINT, sunoPayload, sunoRequestConfig);
+            console.log(`Suno API initial response for song ${songId}:`, sunoResponse.data);
+        } catch (axiosError) {
+            // Handle Axios-specific errors, especially timeouts
+            if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
+                console.warn(`Suno API submission call timed out after ${sunoRequestConfig.timeout}ms for song ${songId}. Assuming task might be processing.`);
+                // Don't throw an error here. Proceed, but sunoResponse will be falsy or empty.
+                // The song status remains 'pending' in DB. Callback/polling must handle final status.
+                sunoResponse = { data: {} }; // Simulate an empty response to prevent breaking subsequent logic
+            } else {
+                // Re-throw other Axios errors (e.g., network, 4xx/5xx from Suno itself)
+                console.error(`Suno API request failed for song ${songId}:`, axiosError.response ? axiosError.response.data : axiosError.message);
+                // This will trigger the main catch block below for refund etc.
+                throw new Error(`Suno API request failed: ${axiosError.message}`);
+            }
+        }
+
+        // Extract Suno Task ID (handle potentially empty sunoResponse.data from timeout)
+        // Use optional chaining ?. incase sunoResponse or sunoResponse.data is null/undefined after timeout
+        const sunoTaskId = sunoResponse?.data?.data?.taskId || sunoResponse?.data?.taskId || null;
 
         if (sunoTaskId) {
-            // Update song record with Suno Task ID and status 'processing'
+            // If we got a task ID, update the song status to 'processing'
             const updateTaskSql = "UPDATE songs SET suno_task_id = $1, status = 'processing' WHERE id = $2";
-            await query(updateTaskSql, [sunoTaskId, songId]);
-            console.log(`Updated song ${songId} with Suno Task ID ${sunoTaskId}`);
-
+            try {
+                await query(updateTaskSql, [sunoTaskId, songId]);
+                console.log(`Updated song ${songId} status to 'processing' with Suno Task ID ${sunoTaskId}`);
+            } catch (dbUpdateError) {
+                 console.error(`Failed to update song ${songId} with task ID ${sunoTaskId}:`, dbUpdateError);
+                 // Log error but proceed to respond to frontend
+            }
+            // Respond with task ID
             res.json({
-                message: "Audio generation task submitted.",
+                message: "Audio generation task submitted successfully.",
                 songId: songId,
-                sunoTaskId: sunoTaskId,
+                sunoTaskId: sunoTaskId, // Include the task ID
                 remainingCredits: userCredits - CREDITS_PER_SONG
             });
         } else {
-            // If Suno didn't return a task ID, mark song as error and refund credits
-            console.error("Unexpected Suno response (missing task ID):", sunoResponse.data);
-            throw new Error("Unexpected response from Suno API (missing task ID)."); // Trigger catch block for refund
+            // If we didn't get a task ID (e.g., due to timeout or missing in response)
+            // The song status remains 'pending' in the DB.
+            // Respond to frontend indicating submission, but status is pending confirmation.
+            console.warn(`Did not receive Suno Task ID for song ${songId} (potentially due to timeout). Status remains 'pending'.`);
+            res.json({
+                message: "Audio generation submitted, status pending confirmation.",
+                songId: songId,
+                sunoTaskId: null, // Explicitly null
+                remainingCredits: userCredits - CREDITS_PER_SONG // Credits were already deducted
+            });
+            // DO NOT throw error here, as the task might still be processing. Callback/polling will resolve.
         }
 
     } catch (error) {
-        console.error("Error during audio generation/submission:", error.message);
+        // This catch block now primarily handles errors *before* the Suno call
+        // or non-timeout errors *during* the Suno call.
+        console.error(`Error during audio generation setup or non-timeout API error for user ${userId}:`, error.message);
 
         // --- Attempt to Rollback/Handle Error ---
         // 1. Mark song as error (if songId was created)
