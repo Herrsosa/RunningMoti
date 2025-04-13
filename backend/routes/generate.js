@@ -31,70 +31,29 @@ router.post('/generate-lyrics', verifyToken, async (req, res) => {
     }
     // --- End Credit Check ---
 
-    // --- Proceed with Lyric Generation (OpenAI call remains the same) ---
+    // --- Create placeholder song record and respond immediately ---
     try {
         const { workout, musicStyle, name } = req.body;
+        const defaultTitle = `${workout || 'Workout'} - ${musicStyle || 'Song'}`; // Generate a default title
 
-        // *** OpenAI API Call - Add timeout ***
-        const openAiPayload = {
-            model: "gpt-4", // Or your preferred model
-            messages: [{
-                role: "user",
-                content: `Write a high-quality motivational song (3–4 minutes long) for athlete ${name || 'the athlete'}, who is preparing for the event: a major athletic challenge.
+        // Insert placeholder record with status 'lyrics_pending'
+        const insertSongSql = `
+            INSERT INTO songs (user_id, workout_input, style_input, name_input, title, status)
+            VALUES ($1, $2, $3, $4, $5, 'lyrics_pending')
+            RETURNING id`;
+        const insertResult = await query(insertSongSql, [userId, workout, musicStyle, name, defaultTitle]);
+        const songId = insertResult.rows[0].id;
+        console.log(`Created placeholder song record ID: ${songId} with status 'lyrics_pending'.`);
 
-The emotional tone should be inspiring.
-
-The song should follow the style of ${musicStyle}, with intense energy, emotionally resonant imagery, and a strong lyrical rhythm. The delivery should include powerful metaphors about endurance, pain, and victory.
-
-Structure the song with:
-- An intro (spoken or low-energy to build anticipation)
-- 2–3 verses exploring struggle, focus, and mental strength
-- A bold, repeatable chorus
-- A bridge that deepens the emotional stakes
-- A final chorus that pushes intensity even further
-
-Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, and worthy of a true champion. This is a lyrical war cry — something that gets in their head and fuels their performance.`
-            }],
-            temperature: 0.7
-        };
-        const openAiConfig = {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-            },
-            timeout: 8000 // 8 seconds timeout
-        };
-
-        let response;
-        try {
-             console.log("Requesting lyrics from OpenAI...");
-             response = await axios.post(process.env.OPENAI_API_ENDPOINT, openAiPayload, openAiConfig);
-             console.log("Received lyrics response from OpenAI.");
-        } catch (axiosError) {
-             if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
-                 console.error(`OpenAI API call timed out after ${openAiConfig.timeout}ms.`);
-                 // Return a specific error indicating the timeout for lyrics generation
-                 return res.status(504).json({ error: 'Lyric generation timed out. Please try again.' });
-             } else {
-                 // Re-throw other Axios errors
-                 console.error('OpenAI API request failed:', axiosError.response ? axiosError.response.data : axiosError.message);
-                 throw new Error(`OpenAI API request failed: ${axiosError.message}`); // Let the main catch block handle it
-             }
-        }
-
-        // Ensure response and expected data structure exist before accessing
-        if (!response?.data?.choices?.[0]?.message?.content) {
-             console.error('Invalid or unexpected response structure from OpenAI:', response?.data);
-             throw new Error('Invalid response received from lyric generation service.');
-        }
-
-        const lyrics = response.data.choices[0].message.content.trim();
-        res.json({ lyrics }); // Send lyrics back
+        // Respond immediately to the frontend with the songId
+        res.status(202).json({ // 202 Accepted indicates async processing started
+            message: "Lyric generation initiated.",
+            songId: songId
+        });
 
     } catch (error) {
-        // This catch block now handles non-timeout errors from the OpenAI call or other logic errors
-        console.error('Error in /generate-lyrics route:', error.message);
-        res.status(500).json({ error: error.message || 'Failed to generate lyrics' });
+        console.error('Error creating placeholder song record:', error.message);
+        res.status(500).json({ error: 'Failed to initiate lyric generation.' });
     }
 });
 
@@ -327,5 +286,124 @@ router.get('/song-status/:sunoTaskId', verifyToken, async (req, res) => { // Mak
         return res.status(500).json({ error: "Database error fetching song status." });
     }
 });
+
+// NEW Endpoint: Process Lyrics Generation (Protected)
+router.post('/process-lyrics/:songId', verifyToken, async (req, res) => {
+    const userId = req.userId;
+    const songId = req.params.songId;
+
+    console.log(`Processing lyrics request for song ID: ${songId} by user ID: ${userId}`);
+
+    try {
+        // 1. Fetch song details (including inputs) and verify ownership
+        const selectSql = `
+            SELECT user_id, workout_input, style_input, name_input, status
+            FROM songs
+            WHERE id = $1`;
+        const selectResult = await query(selectSql, [songId]);
+        const song = selectResult.rows[0];
+
+        if (!song) {
+            console.error(`Process lyrics: Song ID ${songId} not found.`);
+            return res.status(404).json({ error: "Song record not found." });
+        }
+        if (song.user_id !== userId) {
+            console.error(`Process lyrics: User ${userId} does not own song ${songId}.`);
+            return res.status(403).json({ error: "Forbidden." });
+        }
+        // Check if lyrics already generated or if status is wrong
+        if (song.status !== 'lyrics_pending') {
+             console.warn(`Process lyrics: Song ${songId} has status ${song.status}, expected 'lyrics_pending'.`);
+             // If lyrics are already complete, return them to avoid re-generation
+             if (song.status === 'lyrics_complete' || song.status === 'processing' || song.status === 'complete' || song.status === 'error') {
+                 const existingLyricsResult = await query("SELECT lyrics FROM songs WHERE id = $1", [songId]);
+                 if (existingLyricsResult.rows[0]?.lyrics) {
+                     console.log(`Lyrics for song ${songId} already exist, returning existing lyrics.`);
+                     return res.json({ lyrics: existingLyricsResult.rows[0].lyrics });
+                 }
+             }
+             // Otherwise, it's an unexpected state
+             return res.status(409).json({ error: `Cannot generate lyrics, song status is ${song.status}.` });
+        }
+
+        // 2. Call OpenAI API (with timeout)
+        const { workout_input: workout, style_input: musicStyle, name_input: name } = song;
+        const openAiPayload = {
+            model: "gpt-4",
+            messages: [{
+                role: "user",
+                content: `Write a high-quality motivational song (3–4 minutes long) for athlete ${name || 'the athlete'}, who is preparing for the event: a major athletic challenge.
+
+The emotional tone should be inspiring.
+
+The song should follow the style of ${musicStyle}, with intense energy, emotionally resonant imagery, and a strong lyrical rhythm. The delivery should include powerful metaphors about endurance, pain, and victory.
+
+Structure the song with:
+- An intro (spoken or low-energy to build anticipation)
+- 2–3 verses exploring struggle, focus, and mental strength
+- A bold, repeatable chorus
+- A bridge that deepens the emotional stakes
+- A final chorus that pushes intensity even further
+
+Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, and worthy of a true champion. This is a lyrical war cry — something that gets in their head and fuels their performance.`
+            }],
+            temperature: 0.7
+        };
+        const openAiConfig = {
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+            // Use a longer timeout here if needed, as this function can run longer
+            // Vercel Pro plan allows up to 5 minutes, Hobby plan might still timeout here
+            // Let's try 25 seconds first. Adjust based on typical GPT-4 response times.
+            timeout: 25000
+        };
+
+        let openAiResponse;
+        try {
+            console.log(`Requesting lyrics from OpenAI for song ${songId}...`);
+            openAiResponse = await axios.post(process.env.OPENAI_API_ENDPOINT, openAiPayload, openAiConfig);
+            console.log(`Received lyrics response from OpenAI for song ${songId}.`);
+        } catch (axiosError) {
+            // Handle OpenAI timeout or other errors
+            let errorMessage = 'Failed to generate lyrics.';
+            if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
+                errorMessage = `Lyric generation timed out after ${openAiConfig.timeout / 1000} seconds.`;
+                console.error(`OpenAI API call timed out for song ${songId}.`);
+                // Mark song as error? Or leave as pending for retry? Let's mark as error.
+                await query("UPDATE songs SET status = 'lyrics_error' WHERE id = $1", [songId]);
+                return res.status(504).json({ error: errorMessage }); // Gateway Timeout
+            } else {
+                errorMessage = `OpenAI API request failed: ${axiosError.message}`;
+                console.error(`OpenAI API request failed for song ${songId}:`, axiosError.response ? axiosError.response.data : axiosError.message);
+                await query("UPDATE songs SET status = 'lyrics_error' WHERE id = $1", [songId]);
+                // Don't throw, send specific error
+                return res.status(502).json({ error: errorMessage }); // Bad Gateway
+            }
+        }
+
+        // 3. Validate OpenAI response
+        if (!openAiResponse?.data?.choices?.[0]?.message?.content) {
+            console.error(`Invalid or unexpected response structure from OpenAI for song ${songId}:`, openAiResponse?.data);
+            await query("UPDATE songs SET status = 'lyrics_error' WHERE id = $1", [songId]);
+            return res.status(502).json({ error: 'Invalid response received from lyric generation service.' }); // Bad Gateway
+        }
+        const lyrics = openAiResponse.data.choices[0].message.content.trim();
+
+        // 4. Update song record with lyrics and new status
+        const updateSql = `UPDATE songs SET lyrics = $1, status = 'lyrics_complete' WHERE id = $2`;
+        await query(updateSql, [lyrics, songId]);
+        console.log(`Updated song ${songId} with generated lyrics and status 'lyrics_complete'.`);
+
+        // 5. Respond to frontend with lyrics
+        res.json({ lyrics });
+
+    } catch (error) {
+        // Catch errors from DB lookups or unexpected issues
+        console.error(`Error processing lyrics for song ${songId}:`, error.message);
+        // Attempt to mark song as error if possible
+        try { await query("UPDATE songs SET status = 'lyrics_error' WHERE id = $1", [songId]); } catch (e) { /* ignore */ }
+        res.status(500).json({ error: 'Server error processing lyrics generation.' });
+    }
+});
+
 
 module.exports = router;

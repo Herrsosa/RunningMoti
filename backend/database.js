@@ -63,11 +63,11 @@ const initializeDatabase = async () => {
                 suno_task_id TEXT UNIQUE,
                 audio_url TEXT,
                 title TEXT,
-                status TEXT DEFAULT 'pending',
+                status TEXT DEFAULT 'lyrics_pending', -- Default status for new requests
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log("DB Init: Songs table checked/created.");
+        console.log("DB Init: Songs table checked/created (default status 'lyrics_pending').");
 
         // Add columns if they don't exist (Postgres version)
         await addColumnIfNotExistsPg(client, 'users', 'is_verified', 'BOOLEAN DEFAULT FALSE NOT NULL');

@@ -55,10 +55,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-// --- API Endpoints ---
-// Use a relative path for API requests. This works both locally (if backend is proxied)
-// and when deployed on Vercel, as Vercel routes /api to the backend function.
-const BASE_API_URL = '/api';
+    // --- API Endpoints ---
+    // Use a relative path for API requests. This works both locally (if backend is proxied)
+    // and when deployed on Vercel, as Vercel routes /api to the backend function.
+    const BASE_API_URL = '/api';
 
 
     // --- Utility Functions ---
@@ -153,11 +153,13 @@ const BASE_API_URL = '/api';
                      errorData = await response.json();
                      // Ensure errorData has an 'error' property for consistency
                      if (!errorData.error) {
-                         errorData = { error: JSON.stringify(errorData) }; // Fallback if no standard error field
+                         // Use status text if available and no error message found
+                         errorData = { error: errorData.message || response.statusText || `Request failed with status: ${response.status}` };
                      }
                 } catch(e) {
                     // If parsing fails, use the default HTTP status error
                     console.warn("Could not parse error response JSON body.");
+                     errorData = { error: response.statusText || `Request failed with status: ${response.status}` };
                 }
 
                  // Handle token expiry / unauthorized specifically
@@ -176,6 +178,11 @@ const BASE_API_URL = '/api';
             }
             // Attempt to parse JSON for other successful responses
              try {
+                 // Handle 202 Accepted separately if needed (like from /generate-lyrics)
+                 if (response.status === 202) {
+                     console.log(`Request to ${endpoint} accepted (202).`);
+                     // Fall through to parse JSON, assuming body contains useful info like songId
+                 }
                  return await response.json();
              } catch (e) {
                  console.error(`Failed to parse JSON response for ${endpoint}:`, e);
@@ -314,19 +321,29 @@ const BASE_API_URL = '/api';
          const formattedDate = song.created_at ? new Date(song.created_at).toLocaleDateString() : 'N/A';
 
          let statusOrPlayerHtml = '';
+         // Add new statuses for lyrics generation
          switch(song.status) {
              case 'complete':
                  statusOrPlayerHtml = song.audio_url
                     ? `<audio controls src="${song.audio_url}" class="library-audio-player"></audio>`
-                    : `<span class="badge bg-warning text-dark">Complete (No URL)</span>`; // Should not happen
+                    : `<span class="badge bg-success">Complete (Processing Audio URL...)</span>`; // Or show warning if URL missing unexpectedly
                  break;
              case 'processing':
-                 statusOrPlayerHtml = `<span class="badge bg-info text-dark">Processing...</span>`;
+                 statusOrPlayerHtml = `<span class="badge bg-info text-dark">Generating Audio...</span>`;
                  break;
-             case 'pending':
-                 statusOrPlayerHtml = `<span class="badge bg-secondary">Pending...</span>`;
+             case 'pending': // Now means audio generation pending (after lyrics complete)
+                 statusOrPlayerHtml = `<span class="badge bg-secondary">Audio Pending...</span>`;
                  break;
-             case 'error':
+             case 'lyrics_complete': // New status: Lyrics done, ready for audio
+                 statusOrPlayerHtml = `<span class="badge bg-primary">Lyrics Ready</span>`;
+                 break;
+             case 'lyrics_pending': // New status: Waiting for lyrics
+                 statusOrPlayerHtml = `<span class="badge bg-light text-dark">Generating Lyrics...</span>`;
+                 break;
+             case 'lyrics_error': // New status: Error during lyrics
+                 statusOrPlayerHtml = `<span class="badge bg-warning text-dark">Lyrics Error</span>`;
+                 break;
+             case 'error': // General audio error
              default:
                  statusOrPlayerHtml = `<span class="badge bg-danger">Error</span>`;
                  break;
@@ -339,7 +356,7 @@ const BASE_API_URL = '/api';
             </div>
             <div class="library-item-controls">
                 ${statusOrPlayerHtml}
-                ${song.status !== 'processing' && song.status !== 'pending' ? // Only show delete for final states
+                ${song.status !== 'processing' && song.status !== 'pending' && song.status !== 'lyrics_pending' ? // Only show delete for final/error states
                     `<button class="btn btn-sm btn-outline-danger btn-delete-song" data-song-id="${song.id}" title="Delete Song">X</button>` : ''
                 }
             </div>
@@ -396,7 +413,7 @@ const BASE_API_URL = '/api';
     }
 
 
-    // Generator Form Submission Handler
+    // Generator Form Submission Handler - REFACTORED for Async Lyrics
     if (songForm) {
         songForm.addEventListener('submit', async function (e) {
             e.preventDefault();
@@ -426,7 +443,7 @@ const BASE_API_URL = '/api';
 
             // 3. Form Validation
             let isValid = true;
-            generalErrorDiv.style.display = 'none';
+            generalErrorDiv.style.display = 'none'; // Clear previous errors
             workoutErrorDiv.style.display = 'none';
             toneErrorDiv.style.display = 'none';
             workoutInput.classList.remove('is-invalid');
@@ -445,7 +462,8 @@ const BASE_API_URL = '/api';
             if (!isValid) return;
 
             // --- If valid, proceed ---
-            audioResultContainer.style.display = 'none';
+            audioResultContainer.style.display = 'none'; // Hide previous results
+            lyricsOutput.textContent = ''; // Clear previous lyrics
             loadingIndicator.style.display = 'block';
             loadingMessage.textContent = "Preparing generation...";
             motivateButton.disabled = true;
@@ -456,26 +474,62 @@ const BASE_API_URL = '/api';
             const name = nameInput ? nameInput.value.trim() : ''; // Handle optional name input
 
             let pollInterval; // Declare interval variable in wider scope
+            let lyrics; // Declare lyrics variable in wider scope
+            let songId; // Store the song ID
 
             try {
-                // Step 1: Generate Lyrics (Backend handles credit check)
-                loadingMessage.textContent = "Generating lyrics...";
-                const lyricsData = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, name }); // Requires auth implicitly via apiRequest
-                const lyrics = lyricsData.lyrics;
-                lyricsOutput.textContent = lyrics;
-                console.log("Lyrics generation initiated by backend.");
+                // --- Step 1: Initiate Lyric Generation (Async Backend) ---
+                loadingMessage.textContent = "Initiating lyric generation...";
+                // This endpoint now just creates the DB record and returns the ID
+                const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, name });
+                songId = initiateLyricsResponse.songId; // Get the song ID
+                console.log(`Lyric generation initiated for song ID: ${songId}`);
 
-                // Step 2: Generate Audio (Backend handles credit deduction)
+                // --- Step 2: Process Lyrics (Call the new endpoint) ---
+                loadingMessage.textContent = "Generating lyrics (this may take a moment)...";
+                // This endpoint actually calls OpenAI and waits, then returns lyrics
+                const processLyricsResponse = await apiRequest(`/generate/process-lyrics/${songId}`, 'POST'); // Send POST to trigger processing
+                lyrics = processLyricsResponse.lyrics; // Get the actual lyrics
+                lyricsOutput.textContent = lyrics; // Display lyrics
+                console.log(`Lyrics received for song ID: ${songId}`);
+
+                // --- Step 3: Generate Audio (using received lyrics and songId) ---
+                // NOTE: Backend /generate-audio needs adjustment to UPDATE the existing song record (identified by songId)
+                // instead of creating a new one. It should also handle credit deduction there.
+                // Assuming backend is adjusted to accept songId and update.
                 loadingMessage.textContent = "Submitting audio generation task...";
-                const audioSubmitData = await apiRequest('/generate/generate-audio', 'POST', { lyrics, musicStyle, workout, name }); // Requires auth
-                const songId = audioSubmitData.songId;
-                const sunoTaskId = audioSubmitData.sunoTaskId;
-                currentUser.credits = audioSubmitData.remainingCredits; // Update local credit count
-                 if(creditsDisplay) creditsDisplay.textContent = currentUser.credits; // Update UI
+                const audioSubmitPayload = {
+                    songId: songId, // Pass the existing song ID
+                    lyrics: lyrics,
+                    musicStyle: musicStyle,
+                    workout: workout,
+                    name: name
+                };
+                const audioSubmitData = await apiRequest('/generate/generate-audio', 'POST', audioSubmitPayload);
+
+                // Update credits based on response from /generate-audio
+                currentUser.credits = audioSubmitData.remainingCredits;
+                if(creditsDisplay) creditsDisplay.textContent = currentUser.credits;
+
+                const sunoTaskId = audioSubmitData.sunoTaskId; // Get task ID from response
+
+                if (!sunoTaskId) {
+                     // Handle cases where Suno submission timed out on backend but we got a 2xx response
+                     console.warn(`Audio generation submitted for song ${songId}, but Suno Task ID not immediately available. Relying on callback.`);
+                     loadingMessage.textContent = "Audio generation pending confirmation...";
+                     // Stop loading indicator, show info message
+                     motivateButton.disabled = false;
+                     motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`;
+                     loadingIndicator.style.display = 'none';
+                     showApiError(generalErrorDiv, "Audio generation started. Please check your library shortly for the result.", "Info");
+                     generalErrorDiv.classList.remove('alert-danger'); // Style as info
+                     generalErrorDiv.classList.add('alert-info');
+                     return; // Exit the function, polling won't work without task ID
+                }
 
                 console.log(`Audio task submitted. Song ID: ${songId}, Suno Task ID: ${sunoTaskId}`);
 
-                // Step 3: Poll for status using Suno Task ID
+                // --- Step 4: Poll for audio status using Suno Task ID ---
                 loadingMessage.textContent = "Generating audio (this may take a minute)...";
                 let pollCount = 0;
                 const maxPolls = 45; // Poll for ~2.25 minutes
@@ -516,6 +570,7 @@ const BASE_API_URL = '/api';
                         } else if (statusData.status === 'error') {
                              audioFound = true; // Consider error as 'found' to stop timeout message
                              clearInterval(pollInterval);
+                             // Use error message from backend if available
                              throw new Error(statusData.error || "Audio generation failed during processing.");
 
                         } else if (statusData.status === 'processing' || statusData.status === 'pending') {
@@ -531,18 +586,18 @@ const BASE_API_URL = '/api';
                         }
                     } catch (pollErr) {
                         // Handle errors during the polling request itself
-                        if (pollErr.message.includes("session has expired")) {
+                        if (pollErr.message?.includes("session has expired")) { // Check error message safely
                              // If token expires during polling, stop polling and let error bubble up
                              clearInterval(pollInterval);
                              throw pollErr; // Re-throw auth error
                         }
                         // Log other polling errors but continue polling unless max attempts reached
-                        console.warn(`Polling attempt ${pollCount} failed: ${pollErr.message}. Continuing poll...`);
+                        console.warn(`Polling attempt ${pollCount} failed: ${pollErr.message || pollErr}. Continuing poll...`);
                     }
                 }, 3000); // Poll every 3 seconds
 
             } catch (err) {
-                // Catch errors from lyrics gen, audio submit, or polling timeout/failure
+                // Catch errors from any step: initiate lyrics, process lyrics, submit audio, or polling timeout/failure
                 console.error("Error during generation process:", err);
                 showApiError(generalErrorDiv, err, "Song generation failed."); // Show user-friendly error
                 if(pollInterval) clearInterval(pollInterval); // Ensure polling stops on error
