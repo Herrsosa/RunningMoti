@@ -353,8 +353,8 @@ Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, 
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
             // Use a longer timeout here if needed, as this function can run longer
             // Vercel Pro plan allows up to 5 minutes, Hobby plan might still timeout here
-            // Let's try 25 seconds first. Adjust based on typical GPT-4 response times.
-            timeout: 25000
+            // Increase timeout to 60 seconds.
+            timeout: 60000
         };
 
         let openAiResponse;
