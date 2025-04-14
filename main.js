@@ -340,6 +340,9 @@ document.addEventListener('DOMContentLoaded', function () {
              case 'lyrics_pending': // New status: Waiting for lyrics
                  statusOrPlayerHtml = `<span class="badge bg-light text-dark">Generating Lyrics...</span>`;
                  break;
+             case 'lyrics_processing': // New status: Cron job processing lyrics
+                 statusOrPlayerHtml = `<span class="badge bg-light text-dark">Generating Lyrics...</span>`;
+                 break;
              case 'lyrics_error': // New status: Error during lyrics
                  statusOrPlayerHtml = `<span class="badge bg-warning text-dark">Lyrics Error</span>`;
                  break;
@@ -356,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div class="library-item-controls">
                 ${statusOrPlayerHtml}
-                ${song.status !== 'processing' && song.status !== 'pending' && song.status !== 'lyrics_pending' ? // Only show delete for final/error states
+                ${song.status !== 'processing' && song.status !== 'pending' && song.status !== 'lyrics_pending' && song.status !== 'lyrics_processing' ? // Only show delete for final/error states
                     `<button class="btn btn-sm btn-outline-danger btn-delete-song" data-song-id="${song.id}" title="Delete Song">X</button>` : ''
                 }
             </div>
@@ -413,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-    // Generator Form Submission Handler - REFACTORED for Async Lyrics
+    // Generator Form Submission Handler - REFACTORED for Async Lyrics (Cron Job Approach)
     if (songForm) {
         songForm.addEventListener('submit', async function (e) {
             e.preventDefault();
@@ -473,30 +476,85 @@ document.addEventListener('DOMContentLoaded', function () {
             const musicStyle = musicStyleInput.value;
             const name = nameInput ? nameInput.value.trim() : ''; // Handle optional name input
 
-            let pollInterval; // Declare interval variable in wider scope
-            let lyrics; // Declare lyrics variable in wider scope
+            let lyricsPollInterval; // Interval for lyrics status
+            let audioPollInterval; // Interval for audio status
             let songId; // Store the song ID
+            let lyrics; // Store lyrics
+
+            // Clear any previous intervals just in case
+            if (lyricsPollInterval) clearInterval(lyricsPollInterval);
+            if (audioPollInterval) clearInterval(audioPollInterval);
 
             try {
-                // --- Step 1: Initiate Lyric Generation (Async Backend) ---
+                // --- Step 1: Initiate Lyric Generation (Backend creates pending record) ---
                 loadingMessage.textContent = "Initiating lyric generation...";
-                // This endpoint now just creates the DB record and returns the ID
                 const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, name });
                 songId = initiateLyricsResponse.songId; // Get the song ID
-                console.log(`Lyric generation initiated for song ID: ${songId}`);
+                console.log(`Lyric generation initiated for song ID: ${songId}. Starting status poll.`);
 
-                // --- Step 2: Process Lyrics (Call the new endpoint) ---
-                loadingMessage.textContent = "Generating lyrics (this may take a moment)...";
-                // This endpoint actually calls OpenAI and waits, then returns lyrics
-                const processLyricsResponse = await apiRequest(`/generate/process-lyrics/${songId}`, 'POST'); // Send POST to trigger processing
-                lyrics = processLyricsResponse.lyrics; // Get the actual lyrics
-                lyricsOutput.textContent = lyrics; // Display lyrics
-                console.log(`Lyrics received for song ID: ${songId}`);
+                // --- Step 2: Poll for Lyrics Status ---
+                loadingMessage.textContent = "Generating lyrics (waiting for background process)...";
+                let lyricsPollCount = 0;
+                const maxLyricsPolls = 60; // Poll for ~3 minutes max for lyrics
 
-                // --- Step 3: Generate Audio (using received lyrics and songId) ---
-                // NOTE: Backend /generate-audio needs adjustment to UPDATE the existing song record (identified by songId)
-                // instead of creating a new one. It should also handle credit deduction there.
-                // Assuming backend is adjusted to accept songId and update.
+                lyrics = await new Promise((resolve, reject) => {
+                    lyricsPollInterval = setInterval(async () => {
+                        lyricsPollCount++;
+                        if (lyricsPollCount > maxLyricsPolls) {
+                            clearInterval(lyricsPollInterval);
+                            reject(new Error("Lyric generation timed out. Please try again later."));
+                            return;
+                        }
+
+                        try {
+                            const statusData = await apiRequest(`/generate/lyrics-status/${songId}`, 'GET');
+                            // Update message based on status
+                            switch(statusData.status) {
+                                case 'lyrics_complete':
+                                    loadingMessage.textContent = `Lyrics generated!`;
+                                    break;
+                                case 'lyrics_processing':
+                                    loadingMessage.textContent = `Generating lyrics... (Processing)`;
+                                    break;
+                                case 'lyrics_pending':
+                                    loadingMessage.textContent = `Generating lyrics... (Pending)`;
+                                    break;
+                                case 'lyrics_error':
+                                    loadingMessage.textContent = `Lyrics generation failed.`;
+                                    break;
+                                default:
+                                    loadingMessage.textContent = `Generating lyrics... (Status: ${statusData.status || 'unknown'})`;
+                            }
+
+
+                            if (statusData.status === 'lyrics_complete' && statusData.lyrics) {
+                                clearInterval(lyricsPollInterval);
+                                console.log(`Lyrics received for song ID: ${songId}`);
+                                lyricsOutput.textContent = statusData.lyrics; // Display lyrics
+                                resolve(statusData.lyrics); // Resolve the promise with lyrics
+                            } else if (statusData.status === 'lyrics_error') {
+                                clearInterval(lyricsPollInterval);
+                                reject(new Error("Lyric generation failed. Please check logs or try again."));
+                            } else if (statusData.status === 'lyrics_pending' || statusData.status === 'lyrics_processing') {
+                                // Continue polling
+                                console.log(`Polling lyrics status for ${songId}: ${statusData.status}`);
+                            } else {
+                                // Unknown status - potentially an issue, stop polling?
+                                console.warn(`Unknown lyrics status received for ${songId}:`, statusData);
+                                // Maybe stop polling after a few unknowns? For now, continue.
+                            }
+                        } catch (pollErr) {
+                            console.warn(`Lyrics polling attempt ${lyricsPollCount} failed: ${pollErr.message || pollErr}. Continuing poll...`);
+                            if (pollErr.message?.includes("session has expired")) {
+                                clearInterval(lyricsPollInterval);
+                                reject(pollErr); // Reject on auth error
+                            }
+                            // Consider stopping polling after several consecutive errors
+                        }
+                    }, 5000); // Poll every 5 seconds for lyrics
+                }); // End of Promise for lyrics polling
+
+                // --- Step 3: Generate Audio (if lyrics were received) ---
                 loadingMessage.textContent = "Submitting audio generation task...";
                 const audioSubmitPayload = {
                     songId: songId, // Pass the existing song ID
@@ -505,6 +563,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     workout: workout,
                     name: name
                 };
+                // NOTE: Backend /generate-audio needs adjustment to UPDATE the existing song record
+                // It currently creates a NEW record which is wrong.
+                // Assuming backend is adjusted:
                 const audioSubmitData = await apiRequest('/generate/generate-audio', 'POST', audioSubmitPayload);
 
                 // Update credits based on response from /generate-audio
@@ -514,17 +575,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 const sunoTaskId = audioSubmitData.sunoTaskId; // Get task ID from response
 
                 if (!sunoTaskId) {
-                     // Handle cases where Suno submission timed out on backend but we got a 2xx response
                      console.warn(`Audio generation submitted for song ${songId}, but Suno Task ID not immediately available. Relying on callback.`);
                      loadingMessage.textContent = "Audio generation pending confirmation...";
-                     // Stop loading indicator, show info message
                      motivateButton.disabled = false;
                      motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`;
                      loadingIndicator.style.display = 'none';
                      showApiError(generalErrorDiv, "Audio generation started. Please check your library shortly for the result.", "Info");
-                     generalErrorDiv.classList.remove('alert-danger'); // Style as info
+                     generalErrorDiv.classList.remove('alert-danger');
                      generalErrorDiv.classList.add('alert-info');
-                     return; // Exit the function, polling won't work without task ID
+                     return; // Exit, polling won't work
                 }
 
                 console.log(`Audio task submitted. Song ID: ${songId}, Suno Task ID: ${sunoTaskId}`);
@@ -535,10 +594,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const maxPolls = 45; // Poll for ~2.25 minutes
                 let audioFound = false;
 
-                pollInterval = setInterval(async () => {
+                audioPollInterval = setInterval(async () => { // Assign to audioPollInterval
                     pollCount++;
                     if (pollCount > maxPolls) {
-                        clearInterval(pollInterval);
+                        clearInterval(audioPollInterval);
                         if (!audioFound) {
                              throw new Error("Audio generation timed out. Please check your library later.");
                         }
@@ -551,7 +610,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                         if (statusData.status === 'complete' && statusData.audioUrl) {
                             audioFound = true;
-                            clearInterval(pollInterval);
+                            clearInterval(audioPollInterval);
                             console.log("Audio processing complete. URL:", statusData.audioUrl);
 
                             audioPlayer.src = statusData.audioUrl;
@@ -569,7 +628,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                         } else if (statusData.status === 'error') {
                              audioFound = true; // Consider error as 'found' to stop timeout message
-                             clearInterval(pollInterval);
+                             clearInterval(audioPollInterval);
                              // Use error message from backend if available
                              throw new Error(statusData.error || "Audio generation failed during processing.");
 
@@ -588,19 +647,21 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Handle errors during the polling request itself
                         if (pollErr.message?.includes("session has expired")) { // Check error message safely
                              // If token expires during polling, stop polling and let error bubble up
-                             clearInterval(pollInterval);
+                             clearInterval(audioPollInterval);
                              throw pollErr; // Re-throw auth error
                         }
                         // Log other polling errors but continue polling unless max attempts reached
                         console.warn(`Polling attempt ${pollCount} failed: ${pollErr.message || pollErr}. Continuing poll...`);
                     }
-                }, 3000); // Poll every 3 seconds
+                }, 3000); // Poll every 3 seconds for audio
 
             } catch (err) {
                 // Catch errors from any step: initiate lyrics, process lyrics, submit audio, or polling timeout/failure
                 console.error("Error during generation process:", err);
                 showApiError(generalErrorDiv, err, "Song generation failed."); // Show user-friendly error
-                if(pollInterval) clearInterval(pollInterval); // Ensure polling stops on error
+                // Clear both intervals on error
+                if(lyricsPollInterval) clearInterval(lyricsPollInterval);
+                if(audioPollInterval) clearInterval(audioPollInterval);
                 loadingIndicator.style.display = 'none';
                 motivateButton.disabled = false;
                 motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`; // Reset button text

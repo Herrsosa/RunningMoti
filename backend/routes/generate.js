@@ -31,73 +31,82 @@ router.post('/generate-lyrics', verifyToken, async (req, res) => {
     }
     // --- End Credit Check ---
 
-    // --- Create placeholder song record and respond immediately ---
+    // --- Create Song Record with 'lyrics_pending' status ---
     try {
         const { workout, musicStyle, name } = req.body;
         const defaultTitle = `${workout || 'Workout'} - ${musicStyle || 'Song'}`; // Generate a default title
 
-        // Insert placeholder record with status 'lyrics_pending'
+        // Insert record with inputs and 'lyrics_pending' status. Lyrics column will be NULL initially.
         const insertSongSql = `
             INSERT INTO songs (user_id, workout_input, style_input, name_input, title, status)
             VALUES ($1, $2, $3, $4, $5, 'lyrics_pending')
             RETURNING id`;
         const insertResult = await query(insertSongSql, [userId, workout, musicStyle, name, defaultTitle]);
         const songId = insertResult.rows[0].id;
-        console.log(`Created placeholder song record ID: ${songId} with status 'lyrics_pending'.`);
+        console.log(`Created song record ID: ${songId} with status 'lyrics_pending'.`);
 
-        // Respond immediately to the frontend with the songId
-        res.status(202).json({ // 202 Accepted indicates async processing started
-            message: "Lyric generation initiated.",
+        // Respond immediately to the frontend with the songId, indicating async processing
+        res.status(202).json({ // 202 Accepted
+            message: "Lyric generation request accepted.",
             songId: songId
         });
 
     } catch (error) {
-        console.error('Error creating placeholder song record:', error.message);
-        res.status(500).json({ error: 'Failed to initiate lyric generation.' });
+        console.error('Error initiating lyric generation (creating song record):', error.message);
+        res.status(500).json({ error: 'Server error initiating lyric generation.' });
     }
 });
 
-// Generate audio endpoint (Protected) - REFACTORED for PostgreSQL
+// Generate audio endpoint (Protected) - REFACTORED for Async Lyrics Flow
 router.post('/generate-audio', verifyToken, async (req, res) => {
     const userId = req.userId;
-    const { lyrics, musicStyle, workout, name } = req.body;
+    // Expect songId, lyrics, musicStyle, workout, name in the body
+    const { songId, lyrics, musicStyle, workout, name } = req.body;
+
+    if (!songId || !lyrics) {
+        return res.status(400).json({ error: "Missing songId or lyrics." });
+    }
 
     let userCredits;
-    let songId;
-    const defaultTitle = `${workout || 'Workout'} - ${musicStyle || 'Song'}`;
+    const defaultTitle = `${workout || 'Workout'} - ${musicStyle || 'Song'}`; // Use inputs for title consistency
 
-    // --- Wrap DB operations and Suno call in a try block for potential rollback/refund ---
     try {
-        // --- Double Check Credits ---
+        // --- Verify Song Ownership and Status ---
+        const songCheckSql = "SELECT user_id, status FROM songs WHERE id = $1";
+        const songCheckResult = await query(songCheckSql, [songId]);
+        const song = songCheckResult.rows[0];
+
+        if (!song) {
+            return res.status(404).json({ error: "Song record not found." });
+        }
+        if (song.user_id !== userId) {
+            return res.status(403).json({ error: "Forbidden (song ownership mismatch)." });
+        }
+        // Ensure lyrics are complete before proceeding
+        if (song.status !== 'lyrics_complete') {
+             return res.status(409).json({ error: `Cannot generate audio, song status is '${song.status}' (expected 'lyrics_complete').` });
+        }
+
+        // --- Check Credits & Deduct ---
         const creditCheckSql = "SELECT credits FROM users WHERE id = $1";
         const creditResult = await query(creditCheckSql, [userId]);
         const user = creditResult.rows[0];
 
-        if (!user) return res.status(404).json({ error: "User not found." });
+        if (!user) return res.status(404).json({ error: "User not found for credit check." }); // Should not happen
         if (user.credits < CREDITS_PER_SONG) return res.status(402).json({ error: "Insufficient credits." });
-        userCredits = user.credits; // Store current credits
+        userCredits = user.credits;
 
-        // --- Deduct credits BEFORE starting generation ---
+        // Deduct credits
         const deductSql = "UPDATE users SET credits = credits - $1 WHERE id = $2";
         const deductResult = await query(deductSql, [CREDITS_PER_SONG, userId]);
         if (deductResult.rowCount === 0) {
-            // Should not happen if user was found, but safeguard
             throw new Error("Failed to deduct credits (user not found or concurrent update).");
         }
-        console.log(`Credits deducted for user ${userId}. New balance (potential): ${userCredits - CREDITS_PER_SONG}`);
+        console.log(`Credits deducted for user ${userId} for song ${songId}. New balance: ${userCredits - CREDITS_PER_SONG}`);
 
-        // --- Create Song Record in DB (Status: Pending) ---
-        const insertSongSql = `
-            INSERT INTO songs (user_id, workout_input, style_input, name_input, lyrics, title, status)
-            VALUES ($1, $2, $3, $4, $5, $6, 'pending')
-            RETURNING id`;
-        const insertResult = await query(insertSongSql, [userId, workout, musicStyle, name, lyrics, defaultTitle]);
-        songId = insertResult.rows[0].id;
-        console.log(`Initial song record created with ID: ${songId}`);
-
-        // --- Initiate Suno Generation ---
-        // *** Suno API Call - Add timeout and specific error handling ***
-        const callbackUrl = `${process.env.SUNO_CALLBACK_URL}?songId=${songId}`;
+        // --- Initiate Suno Generation (using existing songId) ---
+        // *** Suno API Call - Keep timeout and specific error handling ***
+        const callbackUrl = `${process.env.SUNO_CALLBACK_URL}?songId=${songId}`; // Use the existing songId
         let sunoResponse;
         const sunoRequestConfig = {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUNO_API_KEY}` },
@@ -105,93 +114,74 @@ router.post('/generate-audio', verifyToken, async (req, res) => {
         };
         const sunoPayload = {
             customMode: true, instrumental: false, model: "V3_5",
-            style: musicStyle.slice(0, 200), title: defaultTitle.slice(0, 80),
+            style: musicStyle.slice(0, 200), title: defaultTitle.slice(0, 80), // Use consistent title
             prompt: lyrics.slice(0, 3000), callBackUrl: callbackUrl
         };
 
         try {
-            console.log(`Submitting job to Suno for song ${songId}...`);
+            console.log(`Submitting audio job to Suno for song ${songId}...`);
             sunoResponse = await axios.post(process.env.SUNO_API_ENDPOINT, sunoPayload, sunoRequestConfig);
             console.log(`Suno API initial response for song ${songId}:`, sunoResponse.data);
         } catch (axiosError) {
-            // Handle Axios-specific errors, especially timeouts
             if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
                 console.warn(`Suno API submission call timed out after ${sunoRequestConfig.timeout}ms for song ${songId}. Assuming task might be processing.`);
-                // Don't throw an error here. Proceed, but sunoResponse will be falsy or empty.
-                // The song status remains 'pending' in DB. Callback/polling must handle final status.
-                sunoResponse = { data: {} }; // Simulate an empty response to prevent breaking subsequent logic
+                // Update status to 'pending' (audio pending), but don't throw error
+                await query("UPDATE songs SET status = 'pending' WHERE id = $1", [songId]);
+                sunoResponse = { data: {} }; // Simulate empty response
             } else {
-                // Re-throw other Axios errors (e.g., network, 4xx/5xx from Suno itself)
                 console.error(`Suno API request failed for song ${songId}:`, axiosError.response ? axiosError.response.data : axiosError.message);
-                // This will trigger the main catch block below for refund etc.
-                throw new Error(`Suno API request failed: ${axiosError.message}`);
+                throw new Error(`Suno API request failed: ${axiosError.message}`); // Trigger main catch block for refund
             }
         }
 
-        // Extract Suno Task ID (handle potentially empty sunoResponse.data from timeout)
-        // Use optional chaining ?. incase sunoResponse or sunoResponse.data is null/undefined after timeout
         const sunoTaskId = sunoResponse?.data?.data?.taskId || sunoResponse?.data?.taskId || null;
 
         if (sunoTaskId) {
-            // If we got a task ID, update the song status to 'processing'
+            // Update existing song record with Suno Task ID and status 'processing'
             const updateTaskSql = "UPDATE songs SET suno_task_id = $1, status = 'processing' WHERE id = $2";
-            try {
-                await query(updateTaskSql, [sunoTaskId, songId]);
-                console.log(`Updated song ${songId} status to 'processing' with Suno Task ID ${sunoTaskId}`);
-            } catch (dbUpdateError) {
-                 console.error(`Failed to update song ${songId} with task ID ${sunoTaskId}:`, dbUpdateError);
-                 // Log error but proceed to respond to frontend
-            }
+            await query(updateTaskSql, [sunoTaskId, songId]);
+            console.log(`Updated song ${songId} status to 'processing' with Suno Task ID ${sunoTaskId}`);
             // Respond with task ID
             res.json({
                 message: "Audio generation task submitted successfully.",
-                songId: songId,
-                sunoTaskId: sunoTaskId, // Include the task ID
+                songId: songId, // Return the same songId
+                sunoTaskId: sunoTaskId,
                 remainingCredits: userCredits - CREDITS_PER_SONG
             });
         } else {
-            // If we didn't get a task ID (e.g., due to timeout or missing in response)
-            // The song status remains 'pending' in the DB.
-            // Respond to frontend indicating submission, but status is pending confirmation.
-            console.warn(`Did not receive Suno Task ID for song ${songId} (potentially due to timeout). Status remains 'pending'.`);
+            // If Suno submission timed out (status already set to 'pending' in timeout catch block)
+            console.warn(`Did not receive Suno Task ID for song ${songId} (due to timeout). Status is 'pending'.`);
             res.json({
-                message: "Audio generation submitted, status pending confirmation.",
-                songId: songId,
-                sunoTaskId: null, // Explicitly null
+                message: "Audio generation submitted, status pending confirmation.", // Inform frontend
+                songId: songId, // Return the same songId
+                sunoTaskId: null,
                 remainingCredits: userCredits - CREDITS_PER_SONG // Credits were already deducted
             });
-            // DO NOT throw error here, as the task might still be processing. Callback/polling will resolve.
         }
 
     } catch (error) {
-        // This catch block now primarily handles errors *before* the Suno call
-        // or non-timeout errors *during* the Suno call.
-        console.error(`Error during audio generation setup or non-timeout API error for user ${userId}:`, error.message);
+        // This catch block handles DB errors, credit deduction errors, or non-timeout Suno API errors
+        console.error(`Error during audio generation submission for song ${songId}:`, error.message);
 
-        // --- Attempt to Rollback/Handle Error ---
-        // 1. Mark song as error (if songId was created)
-        if (songId) {
-            try {
-                const errorSql = "UPDATE songs SET status = 'error' WHERE id = $1";
-                await query(errorSql, [songId]);
-                console.log(`Marked song ${songId} as error due to generation failure.`);
-            } catch (dbErr) {
-                console.error(`Failed to mark song ${songId} as error:`, dbErr);
-            }
-        }
-        // 2. Refund credits (if they were likely deducted)
-        if (userCredits !== undefined) { // Check if credit check succeeded
-             try {
+        // Attempt to Rollback: Mark song as error and refund credits
+        try {
+            // Mark song as error (use the songId from the request body)
+            const errorSql = "UPDATE songs SET status = 'error' WHERE id = $1";
+            await query(errorSql, [songId]);
+            console.log(`Marked song ${songId} as error due to audio generation failure.`);
+
+            // Refund credits only if they were successfully checked/stored before the error
+            if (userCredits !== undefined) {
                  const refundSql = "UPDATE users SET credits = credits + $1 WHERE id = $2";
                  await query(refundSql, [CREDITS_PER_SONG, userId]);
-                 console.log(`Refunded ${CREDITS_PER_SONG} credit(s) to user ${userId}.`);
-             } catch (dbErr) {
-                 console.error(`CRITICAL: Failed to refund credits to user ${userId}:`, dbErr);
-                 // Log this critical failure prominently
-             }
+                 console.log(`Refunded ${CREDITS_PER_SONG} credit(s) to user ${userId} for failed audio generation.`);
+            }
+        } catch (rollbackError) {
+             console.error(`CRITICAL: Failed during error handling/rollback for song ${songId}:`, rollbackError);
         }
-        // 3. Send error response
-        res.status(500).json({ error: error.message || 'Failed to initiate audio generation' });
+
+        // Send error response
+        res.status(500).json({ error: error.message || 'Failed to initiate audio generation.' });
     }
 });
 
@@ -402,6 +392,135 @@ Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, 
         // Attempt to mark song as error if possible
         try { await query("UPDATE songs SET status = 'lyrics_error' WHERE id = $1", [songId]); } catch (e) { /* ignore */ }
         res.status(500).json({ error: 'Server error processing lyrics generation.' });
+    }
+});
+
+// NEW Endpoint: Get Lyric Generation Status (Protected) - For Frontend Polling
+router.get('/lyrics-status/:songId', verifyToken, async (req, res) => {
+    const userId = req.userId;
+    const songId = req.params.songId;
+
+    try {
+        const sql = "SELECT user_id, status, lyrics FROM songs WHERE id = $1";
+        const result = await query(sql, [songId]);
+        const song = result.rows[0];
+
+        if (!song) {
+            return res.status(404).json({ error: "Song not found." });
+        }
+        // Verify ownership
+        if (song.user_id !== userId) {
+            return res.status(403).json({ error: "Forbidden." });
+        }
+
+        res.json({
+            status: song.status,
+            lyrics: song.lyrics // Will be null until status is 'lyrics_complete'
+        });
+
+    } catch (error) {
+        console.error(`Error fetching lyrics status for song ${songId}:`, error.message);
+        res.status(500).json({ error: "Server error fetching status." });
+    }
+});
+
+
+// NEW Endpoint: Process Pending Lyrics (Called by Cron Job - Needs Protection)
+// IMPORTANT: Add protection (e.g., check secret header) if making this public-facing
+// For Vercel Cron, it's called internally, but good practice to secure.
+router.post('/cron/process-lyrics-queue', async (req, res) => {
+    // Optional: Add secret validation if needed
+    // const cronSecret = req.headers['x-vercel-cron-secret'];
+    // if (cronSecret !== process.env.CRON_SECRET) {
+    //     return res.status(401).send('Unauthorized');
+    // }
+
+    console.log("Cron Job: Checking for pending lyrics...");
+    let songToProcess = null;
+
+    try {
+        // 1. Find one song that is pending lyrics generation
+        // Use FOR UPDATE SKIP LOCKED to handle potential concurrency if cron runs frequently
+        const findSql = `
+            SELECT id, user_id, workout_input, style_input, name_input
+            FROM songs
+            WHERE status = 'lyrics_pending'
+            ORDER BY created_at ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED`;
+        const findResult = await query(findSql);
+        songToProcess = findResult.rows[0];
+
+        if (!songToProcess) {
+            console.log("Cron Job: No pending lyrics found.");
+            return res.status(200).json({ message: "No pending lyrics found." });
+        }
+
+        const { id: songId, workout_input: workout, style_input: musicStyle, name_input: name } = songToProcess;
+        console.log(`Cron Job: Found pending song ID: ${songId}. Attempting to process.`);
+
+        // 2. Mark song as processing immediately
+        await query("UPDATE songs SET status = 'lyrics_processing' WHERE id = $1", [songId]);
+        console.log(`Cron Job: Marked song ${songId} as 'lyrics_processing'.`);
+
+        // 3. Call OpenAI API (with timeout)
+        const openAiPayload = {
+            model: "gpt-4",
+            messages: [{
+                role: "user",
+                content: `Write a high-quality motivational song (3–4 minutes long) for athlete ${name || 'the athlete'}, who is preparing for the event: a major athletic challenge... [Your full prompt here]` // Truncated for brevity
+            }],
+            temperature: 0.7
+        };
+        const openAiConfig = {
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+            timeout: 60000 // 60 seconds timeout for the cron job context
+        };
+
+        let openAiResponse;
+        let lyrics;
+        let finalStatus = 'lyrics_error'; // Default to error
+
+        try {
+            console.log(`Cron Job: Requesting lyrics from OpenAI for song ${songId}...`);
+            openAiResponse = await axios.post(process.env.OPENAI_API_ENDPOINT, openAiPayload, openAiConfig);
+
+            if (openAiResponse?.data?.choices?.[0]?.message?.content) {
+                lyrics = openAiResponse.data.choices[0].message.content.trim();
+                finalStatus = 'lyrics_complete';
+                console.log(`Cron Job: Successfully generated lyrics for song ${songId}.`);
+            } else {
+                console.error(`Cron Job: Invalid response structure from OpenAI for song ${songId}:`, openAiResponse?.data);
+                // Keep finalStatus as 'lyrics_error'
+            }
+        } catch (axiosError) {
+            console.error(`Cron Job: OpenAI API call failed for song ${songId}:`, axiosError.message);
+            // Keep finalStatus as 'lyrics_error'
+            if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
+                 console.error(`Cron Job: OpenAI API call timed out for song ${songId}.`);
+            }
+        }
+
+        // 4. Update song record with lyrics and final status
+        const updateSql = `UPDATE songs SET lyrics = $1, status = $2 WHERE id = $3`;
+        await query(updateSql, [lyrics, finalStatus, songId]);
+        console.log(`Cron Job: Updated song ${songId} with status '${finalStatus}'.`);
+
+        res.status(200).json({ message: `Processed song ${songId} with status ${finalStatus}.` });
+
+    } catch (error) {
+        console.error("Cron Job: Error processing lyrics queue:", error.message);
+        // If we managed to mark the song as processing, try to mark it as error
+        if (songToProcess?.id) {
+            try {
+                await query("UPDATE songs SET status = 'lyrics_error' WHERE id = $1 AND status = 'lyrics_processing'", [songToProcess.id]);
+                console.log(`Cron Job: Marked song ${songToProcess.id} as 'lyrics_error' due to processing failure.`);
+            } catch (updateErr) {
+                console.error(`Cron Job: Failed to mark song ${songToProcess.id} as error after failure:`, updateErr);
+            }
+        }
+        // Respond with error, but cron should ideally not fail completely
+        res.status(500).json({ error: 'Cron job failed during processing.' });
     }
 });
 
