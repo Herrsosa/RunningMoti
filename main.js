@@ -492,23 +492,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 songId = initiateLyricsResponse.songId; // Get the song ID
                 console.log(`Lyric generation initiated for song ID: ${songId}. Starting status poll.`);
 
-                // --- Step 2: Poll for Lyrics Status ---
+                // --- Step 2: Poll for Lyrics Status using /lyrics-status endpoint ---
                 loadingMessage.textContent = "Generating lyrics (waiting for background process)...";
                 let lyricsPollCount = 0;
-                const maxLyricsPolls = 60; // Poll for ~3 minutes max for lyrics
+                const maxLyricsPolls = 60; // Poll for ~5 minutes max for lyrics (Cron runs every minute)
 
                 lyrics = await new Promise((resolve, reject) => {
                     lyricsPollInterval = setInterval(async () => {
                         lyricsPollCount++;
                         if (lyricsPollCount > maxLyricsPolls) {
                             clearInterval(lyricsPollInterval);
-                            reject(new Error("Lyric generation timed out. Please try again later."));
+                            reject(new Error("Lyric generation timed out. The background job might be delayed or failed. Please check the library later."));
                             return;
                         }
 
                         try {
+                            // Poll the CORRECT status endpoint
                             const statusData = await apiRequest(`/generate/lyrics-status/${songId}`, 'GET');
-                            // Update message based on status
+                            console.log(`Polling lyrics status for ${songId}:`, statusData);
+
+                            // Update UI message based on status
                             switch(statusData.status) {
                                 case 'lyrics_complete':
                                     loadingMessage.textContent = `Lyrics generated!`;
@@ -517,7 +520,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                     loadingMessage.textContent = `Generating lyrics... (Processing)`;
                                     break;
                                 case 'lyrics_pending':
-                                    loadingMessage.textContent = `Generating lyrics... (Pending)`;
+                                    loadingMessage.textContent = `Generating lyrics... (Waiting for background job)`;
                                     break;
                                 case 'lyrics_error':
                                     loadingMessage.textContent = `Lyrics generation failed.`;
@@ -526,35 +529,30 @@ document.addEventListener('DOMContentLoaded', function () {
                                     loadingMessage.textContent = `Generating lyrics... (Status: ${statusData.status || 'unknown'})`;
                             }
 
-
+                            // Check for completion or error
                             if (statusData.status === 'lyrics_complete' && statusData.lyrics) {
                                 clearInterval(lyricsPollInterval);
-                                console.log(`Lyrics received for song ID: ${songId}`);
                                 lyricsOutput.textContent = statusData.lyrics; // Display lyrics
                                 resolve(statusData.lyrics); // Resolve the promise with lyrics
                             } else if (statusData.status === 'lyrics_error') {
                                 clearInterval(lyricsPollInterval);
                                 reject(new Error("Lyric generation failed. Please check logs or try again."));
-                            } else if (statusData.status === 'lyrics_pending' || statusData.status === 'lyrics_processing') {
-                                // Continue polling
-                                console.log(`Polling lyrics status for ${songId}: ${statusData.status}`);
-                            } else {
-                                // Unknown status - potentially an issue, stop polling?
-                                console.warn(`Unknown lyrics status received for ${songId}:`, statusData);
-                                // Maybe stop polling after a few unknowns? For now, continue.
                             }
+                            // Otherwise, continue polling ('lyrics_pending' or 'lyrics_processing')
+
                         } catch (pollErr) {
-                            console.warn(`Lyrics polling attempt ${lyricsPollCount} failed: ${pollErr.message || pollErr}. Continuing poll...`);
-                            if (pollErr.message?.includes("session has expired")) {
+                            console.warn(`Lyrics polling attempt ${lyricsPollCount} failed: ${pollErr.message || pollErr}.`);
+                            // Stop polling on critical errors like auth failure
+                            if (pollErr.message?.includes("session has expired") || pollErr.status === 403 || pollErr.status === 404) {
                                 clearInterval(lyricsPollInterval);
-                                reject(pollErr); // Reject on auth error
+                                reject(pollErr);
                             }
-                            // Consider stopping polling after several consecutive errors
+                            // Otherwise, continue polling, maybe with backoff later
                         }
-                    }, 5000); // Poll every 5 seconds for lyrics
+                    }, 10000); // Poll every 10 seconds for lyrics (give cron job time)
                 }); // End of Promise for lyrics polling
 
-                // --- Step 3: Generate Audio (if lyrics were received) ---
+                // --- Step 3: Generate Audio (if lyrics were received successfully) ---
                 loadingMessage.textContent = "Submitting audio generation task...";
                 const audioSubmitPayload = {
                     songId: songId, // Pass the existing song ID
