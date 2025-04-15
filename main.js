@@ -731,3 +731,32 @@ document.addEventListener('DOMContentLoaded', function () {
     updateUIBasedOnLoginState();
 
 }); // End DOMContentLoaded Wrapper
+
+</final_file_content>
+
+IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
+
+<environment_details>
+# VSCode Visible Files
+main.js
+
+# VSCode Open Tabs
+index.html
+backend/package.json
+package.json
+backend/routes/library.js
+backend/server.js
+backend/database.js
+backend/routes/generate.js
+vercel.json
+main.js
+
+# Current Time
+4/15/2025, 8:26:30 AM (Europe/London, UTC+1:00)
+
+# Context Window Usage
+430,166 / 1,048.576K tokens used (41%)
+
+# Current Mode
+ACT MODE
+</environment_details>
