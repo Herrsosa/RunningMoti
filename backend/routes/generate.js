@@ -312,46 +312,134 @@ router.all('/cron/process-audio-queue', async (req, res) => {
     console.log("Cron Job: Checking for pending audio generation...");
     let songToProcess = null;
     let userCredits;
-
+  
     try {
-        const findSql = `
-            SELECT id, user_id, workout_input, style_input, name_input, lyrics, title
-            FROM songs
-            WHERE status = 'audio_pending'
-            ORDER BY created_at ASC
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED`;
-        const findResult = await query(findSql);
-        songToProcess = findResult.rows[0];
-
-        if (!songToProcess) {
-            console.log("Cron Job: No pending audio found.");
-            return res.status(200).json({ message: "No pending audio found." });
+      // 1. Find a song that is pending audio generation
+      const findSql = `
+        SELECT id, user_id, workout_input, style_input, name_input, lyrics, title
+        FROM songs
+        WHERE status = 'audio_pending'
+        ORDER BY created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED`;
+      const findResult = await query(findSql);
+      songToProcess = findResult.rows[0];
+  
+      if (!songToProcess) {
+        console.log("Cron Job: No pending audio found.");
+        return res.status(200).json({ message: "No pending audio found." });
+      }
+  
+      const {
+        id: songId,
+        user_id: userId,
+        lyrics,
+        style_input: musicStyle,
+        title: defaultTitle
+      } = songToProcess;
+  
+      console.log(`Cron Job: Found pending song ID: ${songId}.`);
+  
+      // 2. Check credits
+      const creditCheckSql = "SELECT credits FROM users WHERE id = $1";
+      const creditResult = await query(creditCheckSql, [userId]);
+      const user = creditResult.rows[0];
+  
+      if (!user || user.credits < 1) {
+        console.warn(`User ${userId} has insufficient credits.`);
+        await query("UPDATE songs SET status = 'error' WHERE id = $1", [songId]);
+        return res.status(200).json({ message: "Skipped due to insufficient credits." });
+      }
+  
+      // Store current credit count in case of refund
+      userCredits = user.credits;
+  
+      // 3. Deduct credit
+      await query("UPDATE users SET credits = credits - 1 WHERE id = $1", [userId]);
+      console.log(`Deducted 1 credit from user ${userId}.`);
+  
+      // 4. Mark song as processing
+      await query("UPDATE songs SET status = 'audio_processing' WHERE id = $1", [songId]);
+      console.log(`Marked song ${songId} as 'audio_processing'.`);
+  
+      // 5. Submit to Suno
+      const callbackUrl = `${process.env.SUNO_CALLBACK_URL}?songId=${songId}`;
+      const sunoPayload = {
+        customMode: true,
+        instrumental: false,
+        model: "V3_5",
+        style: musicStyle?.slice(0, 200) || '',
+        title: defaultTitle?.slice(0, 80) || 'Untitled',
+        prompt: lyrics?.slice(0, 3000) || '',
+        callBackUrl: callbackUrl
+      };
+  
+      const sunoConfig = {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.SUNO_API_KEY}`
+        },
+        timeout: 10000 // 10s timeout to avoid blocking the function
+      };
+  
+      let sunoResponse;
+      let sunoTaskId = null;
+      let nextStatus = 'error';
+  
+      try {
+        console.log(`Submitting to Suno for song ${songId}...`);
+        sunoResponse = await axios.post(process.env.SUNO_API_ENDPOINT, sunoPayload, sunoConfig);
+        console.log(`Suno response for song ${songId}:`, sunoResponse.data);
+  
+        sunoTaskId = sunoResponse?.data?.data?.taskId || sunoResponse?.data?.taskId || null;
+        nextStatus = sunoTaskId ? 'processing' : 'error';
+      } catch (err) {
+        console.error(`Suno API request failed for song ${songId}:`, err.message);
+  
+        // If timeout or network error: retry later
+        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+          nextStatus = 'audio_pending'; // retry later
         }
-
-        const { id: songId, user_id: userId, lyrics, style_input: musicStyle, title: defaultTitle } = songToProcess;
-        console.log(`Cron Job: Found pending audio song ID: ${songId}. Attempting to process.`);
-
-        // … credit checks, deduction, Suno submission, DB updates as per your existing code …
-
-        // example snippet:
-        // await query("UPDATE users SET credits=credits-$1 WHERE id=$2", [CREDITS_PER_SONG, userId]);
-        // await query("UPDATE songs SET status='audio_processing' WHERE id=$1", [songId]);
-        // const sunoResponse = await axios.post(…);
-        // await query("UPDATE songs SET suno_task_id=$1, status=$2 WHERE id=$3", [sunoTaskId, nextStatus, songId]);
-        // res.status(200).json({ message: `Processed audio request for song ${songId} with final status ${nextStatus}.` });
-
+      }
+  
+      // 6. Update song with Suno task ID and final status
+      await query(
+        "UPDATE songs SET suno_task_id = $1, status = $2 WHERE id = $3",
+        [sunoTaskId, nextStatus, songId]
+      );
+      console.log(`Updated song ${songId} to status '${nextStatus}' with task ID '${sunoTaskId || 'N/A'}'.`);
+  
+      return res.status(200).json({
+        message: `Audio job submitted for song ${songId}`,
+        status: nextStatus
+      });
+  
     } catch (error) {
-        console.error("Cron Job: Error processing audio queue:", error.message);
-        if (songToProcess?.id) {
-            await query("UPDATE songs SET status = 'error' WHERE id = $1 AND status = 'audio_processing'", [songToProcess.id]);
-            if (userCredits !== undefined) {
-                await query("UPDATE users SET credits = credits + $1 WHERE id = $2", [CREDITS_PER_SONG, songToProcess.user_id]);
-                console.log(`Cron Job: Refunded ${CREDITS_PER_SONG} credit(s) to user ${songToProcess.user_id}.`);
-            }
+      console.error("Error in audio cron:", error.message);
+  
+      // Rollback & refund if possible
+      if (songToProcess?.id) {
+        try {
+          await query(
+            "UPDATE songs SET status = 'error' WHERE id = $1 AND status = 'audio_processing'",
+            [songToProcess.id]
+          );
+  
+          if (userCredits !== undefined) {
+            await query(
+              "UPDATE users SET credits = credits + 1 WHERE id = $1",
+              [songToProcess.user_id]
+            );
+            console.log(`Refunded 1 credit to user ${songToProcess.user_id}.`);
+          }
+        } catch (rollbackErr) {
+          console.error("Failed to rollback or refund after error:", rollbackErr.message);
         }
-        res.status(500).json({ error: 'Cron job failed during audio processing.' });
+      }
+  
+      return res.status(500).json({ error: "Cron job failed during audio processing." });
     }
-});
+  });
+  
 
 module.exports = router;
