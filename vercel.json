@@ -22,11 +22,11 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/process-lyrics-queue",
+      "path": "/api/generate/cron/process-lyrics-queue",
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/process-audio-queue",
+      "path": "/api/generate/cron/process-audio-queue",
       "schedule": "* * * * *"
     }
   ]
