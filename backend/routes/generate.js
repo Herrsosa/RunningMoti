@@ -212,53 +212,100 @@ router.get('/lyrics-status/:songId', verifyToken, async (req, res) => {
 
 // ——— CRON ENDPOINTS ——— //
 
+
 // Process pending lyrics (now responds to GET **and** POST)
 router.all('/cron/process-lyrics-queue', async (req, res) => {
     console.log("Cron Job: Checking for pending lyrics...");
     let songToProcess = null;
-
+  
     try {
-        const findSql = `
-            SELECT id, user_id, workout_input, style_input, name_input
-            FROM songs
-            WHERE status = 'lyrics_pending'
-            ORDER BY created_at ASC
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED`;
-        const findResult = await query(findSql);
-        songToProcess = findResult.rows[0];
-
-        if (!songToProcess) {
-            console.log("Cron Job: No pending lyrics found.");
-            return res.status(200).json({ message: "No pending lyrics found." });
-        }
-
-        const { id: songId, workout_input: workout, style_input: musicStyle, name_input: name } = songToProcess;
-        console.log(`Cron Job: Found pending song ID: ${songId}. Attempting to process.`);
-
-        await query("UPDATE songs SET status = 'lyrics_processing' WHERE id = $1", [songId]);
-        console.log(`Cron Job: Marked song ${songId} as 'lyrics_processing'.`);
-
-        // … OpenAI payload/config & request identical to your existing code …
-
-        // example snippet:
-        // const openAiPayload = { /* … */ };
-        // const openAiConfig  = { /* … */ };
-        // let openAiResponse, lyrics, finalStatus = 'lyrics_error';
-        // try { … } catch(e){ … }
-        // await query("UPDATE songs SET lyrics=$1, status=$2 WHERE id=$3", [lyrics, finalStatus, songId]);
-        // console.log(`Cron Job: Updated song ${songId} with status '${finalStatus}'.`);
-        // res.status(200).json({ message: `Processed song ${songId} with status ${finalStatus}.` });
-
+      // 1) Fetch one pending song
+      const findSql = `
+        SELECT id, workout_input, style_input, name_input
+        FROM songs
+        WHERE status = 'lyrics_pending'
+        ORDER BY created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED`;
+      const findResult = await query(findSql);
+      songToProcess = findResult.rows[0];
+  
+      if (!songToProcess) {
+        console.log("Cron Job: No pending lyrics found.");
+        return res.status(200).json({ message: "No pending lyrics found." });
+      }
+  
+      const { id: songId, workout_input: workout, style_input: musicStyle, name_input: name } = songToProcess;
+      console.log(`Cron Job: Found pending song ID: ${songId}. Attempting to process.`);
+  
+      // 2) Mark as processing
+      await query("UPDATE songs SET status = 'lyrics_processing' WHERE id = $1", [songId]);
+      console.log(`Cron Job: Marked song ${songId} as 'lyrics_processing'.`);
+  
+      // 3) Prepare & send OpenAI request
+      const openAiPayload = {
+        model: "gpt-3.5-turbo",
+        messages: [{
+          role: "user",
+          content: `Write a 3–4 minute motivational song for athlete ${
+            name || 'the athlete'
+          } preparing for a major athletic event, in the style of ${
+            musicStyle || 'motivational'
+          }. Include 2–3 verses, a chorus, and vivid imagery.`
+        }],
+        temperature: 0.7,
+        max_tokens: 1200
+      };
+      const openAiConfig = {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        timeout: 60000
+      };
+  
+      console.log(`Cron Job: Requesting lyrics from OpenAI for song ${songId}…`);
+      const openAiResponse = await axios.post(
+        process.env.OPENAI_API_ENDPOINT,
+        openAiPayload,
+        openAiConfig
+      );
+  
+      // 4) Extract and save lyrics
+      const lyrics = openAiResponse.data.choices?.[0]?.message?.content?.trim() || null;
+      const finalStatus = lyrics ? "lyrics_complete" : "lyrics_error";
+      console.log(
+        `Cron Job: ${
+          lyrics ? "Successfully generated" : "Failed to generate"
+        } lyrics for song ${songId}.`
+      );
+  
+      await query(
+        "UPDATE songs SET lyrics = $1, status = $2 WHERE id = $3",
+        [lyrics, finalStatus, songId]
+      );
+      console.log(`Cron Job: Updated song ${songId} with status '${finalStatus}'.`);
+  
+      // 5) Send a response so Vercel doesn’t timeout
+      return res
+        .status(200)
+        .json({ message: `Processed song ${songId} with status ${finalStatus}.` });
+  
     } catch (error) {
-        console.error("Cron Job: Error processing lyrics queue:", error.message);
-        if (songToProcess?.id) {
-            await query("UPDATE songs SET status = 'lyrics_error' WHERE id = $1 AND status = 'lyrics_processing'", [songToProcess.id]);
-            console.log(`Cron Job: Marked song ${songToProcess.id} as 'lyrics_error' due to processing failure.`);
-        }
-        res.status(500).json({ error: 'Cron job failed during processing.' });
+      console.error("Cron Job: Error processing lyrics queue:", error);
+  
+      if (songToProcess?.id) {
+        await query(
+          "UPDATE songs SET status = 'lyrics_error' WHERE id = $1",
+          [songToProcess.id]
+        );
+        console.log(`Cron Job: Marked song ${songToProcess.id} as 'lyrics_error'.`);
+      }
+  
+      return res.status(500).json({ error: "Cron job failed during processing." });
     }
-});
+  });
+  
 
 // Process pending audio (now responds to GET **and** POST)
 router.all('/cron/process-audio-queue', async (req, res) => {
