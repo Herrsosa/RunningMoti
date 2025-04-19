@@ -208,7 +208,33 @@ router.get('/lyrics-status/:songId', verifyToken, async (req, res) => {
         res.status(500).json({ error: "Server error fetching status." });
     }
 });
+// NEW Endpoint: Get Audio Status by Song ID
+router.get('/audio-status/:songId', verifyToken, async (req, res) => {
+  const userId = req.userId;
+  const songId = req.params.songId;
 
+  try {
+    const result = await query(
+      `SELECT user_id, status, suno_task_id AS sunoTaskId, audio_url AS audioUrl
+         FROM songs
+         WHERE id = $1`,
+      [songId]
+    );
+    const song = result.rows[0];
+
+    if (!song) return res.status(404).json({ error: "Song not found." });
+    if (song.user_id !== userId) return res.status(403).json({ error: "Forbidden." });
+
+    return res.json({
+      status: song.status,
+      sunoTaskId: song.sunoTaskId,
+      audioUrl: song.audioUrl
+    });
+  } catch (err) {
+    console.error("Error fetching audio status:", err);
+    return res.status(500).json({ error: "Server error fetching audio status." });
+  }
+});
 
 // ——— CRON ENDPOINTS ——— //
 

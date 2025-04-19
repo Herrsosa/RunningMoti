@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const libraryEmpty = document.getElementById('libraryEmpty');
     const appTabs = document.getElementById('appTabs');
     const loggedOutCTA = document.getElementById('loggedOutCTA'); // Get CTA div reference
+    const progressContainer    = document.getElementById('progressContainer');
+    const generationProgress   = document.getElementById('generationProgress');
 
     // Generator Form Elements
     const songForm = document.getElementById('songForm');
@@ -122,6 +124,19 @@ document.addEventListener('DOMContentLoaded', function () {
         errorDiv.textContent = String(message);
         errorDiv.style.display = 'block';
     };
+
+    function statusToPercent(status) {
+        switch (status) {
+            case 'lyrics_pending':     return 0;
+            case 'lyrics_processing':  return 30;
+            case 'lyrics_complete':    return 60;
+            case 'audio_pending':      return 70;
+            case 'audio_processing':   return 90;
+            case 'complete':           return 100;
+            case 'error':              return 0;
+            default:                   return 0;
+        }
+    }
 
     // --- API Call Functions ---
     const apiRequest = async (endpoint, method = 'GET', body = null, requiresAuth = true) => {
@@ -523,6 +538,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 default: loadingMessage.textContent = `Generating lyrics... (Status: ${statusData.status || 'unknown'})`;
                             }
 
+                            if (progressContainer && generationProgress) {
+                                progressContainer.style.display = 'block';
+                                generationProgress.value = statusToPercent(statusData.status);
+                            }
+
                             // Check for completion or error
                             if (statusData.status === 'lyrics_complete' && statusData.lyrics) {
                                 clearInterval(lyricsPollInterval);
@@ -576,6 +596,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 case 'lyrics_complete': loadingMessage.textContent = `Generating audio... (Lyrics ready)`; break; // Should transition quickly
                                 case 'error': loadingMessage.textContent = `Audio generation failed.`; break;
                                 default: loadingMessage.textContent = `Generating audio... (Status: ${statusData.status || 'unknown'})`;
+                            }
+
+                            if (progressContainer && generationProgress) {
+                                progressContainer.style.display = 'block';
+                                generationProgress.value = statusToPercent(statusData.status);
                             }
 
                             // Check if Suno Task ID is available and status is 'processing'
@@ -681,6 +706,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     loadLibrary();
                 }
 
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (generationProgress) generationProgress.value = 0;
+
             } catch (err) {
                 // Catch errors from any step
                 console.error("Error during generation process:", err);
@@ -693,6 +721,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`;
                 // Attempt to fetch updated profile in case credits changed on backend before error
                 fetchUserProfile();
+
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (generationProgress) generationProgress.value = 0;
             }
         }); // End songForm submit listener
     } // End if(songForm)
