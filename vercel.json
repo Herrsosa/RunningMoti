@@ -1,20 +1,27 @@
 {
   "version": 2,
+
+  
   "builds": [
-    { "src": "backend/server.js", "use": "@vercel/node" },
+    {
+      "src": "backend/server.js",
+      "use": "@vercel/node",
+      "config": { "maxDuration": 60 }  
+    },
+
+   
     { "src": "*.{html,css,js,png,mp3}", "use": "@vercel/static" }
   ],
-  "functions": {
-    "backend/server.js": {
-      "maxDuration": 60   
-    }
-  },
+
+  
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/server.js" },
-    { "src": "/(.*)",       "dest": "/$1" }
+    { "src": "/(.*)",     "dest": "/$1" }
   ],
+
+
   "crons": [
-    { "path": "/api/cron/process-lyrics-queue", "schedule": "* * * * *" },
-    { "path": "/api/cron/process-audio-queue",  "schedule": "* * * * *" }
+    { "path": "/api/generate/cron/process-lyrics-queue", "schedule": "* * * * *" },
+    { "path": "/api/generate/cron/process-audio-queue",  "schedule": "* * * * *" }
   ]
 }
