@@ -273,11 +273,20 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
         model: "gpt-3.5-turbo",
         messages: [{
           role: "user",
-          content: `Write a 3–4 minute motivational song for athlete ${
-            name || 'the athlete'
-          } preparing for a major athletic event, in the style of ${
-            musicStyle || 'motivational'
-          }. Include 2–3 verses, a chorus, and vivid imagery.`
+          content: `Write a high-quality motivational song (3–4 minutes long) for athlete ${name || 'the athlete'}, who is preparing for the event: ${workout || 'a major athletic challenge'}. 
+
+The emotional tone should be 'gritty, cinematic, and inspiring'. Use the following key phrases or slogans in the lyrics: "No mercy, no quit".
+
+The song should follow the style of ${musicStyle || 'motivational'}, with intense energy, emotionally resonant imagery, and a strong lyrical rhythm. 
+
+Structure the song with:
+- An intro (spoken or low-energy to build anticipation)
+- 2–3 verses exploring struggle, focus, and mental strength
+- A bold, repeatable chorus
+- A bridge that deepens the emotional stakes
+- A final chorus that pushes intensity even further
+
+Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, and worthy of a true champion. This is a lyrical war cry — something that gets in their head and fuels their performance.`
         }],
         temperature: 0.7,
         max_tokens: 700
@@ -312,7 +321,7 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
       );
       console.log(`Cron Job: Updated song ${songId} with status '${finalStatus}'.`);
   
-      // 5) Send a response so Vercel doesn’t timeout
+      // 5) Send a response so Vercel doesn't timeout
       return res
         .status(200)
         .json({ message: `Processed song ${songId} with status ${finalStatus}.` });
