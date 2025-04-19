@@ -254,14 +254,14 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
           }. Include 2–3 verses, a chorus, and vivid imagery.`
         }],
         temperature: 0.7,
-        max_tokens: 1200
+        max_tokens: 700
       };
       const openAiConfig = {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
         },
-        timeout: 60000
+        timeout: 9000
       };
   
       console.log(`Cron Job: Requesting lyrics from OpenAI for song ${songId}…`);
