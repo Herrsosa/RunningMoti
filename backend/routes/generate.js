@@ -32,14 +32,14 @@ router.post('/generate-lyrics', verifyToken, async (req, res) => {
 
     // --- Create Song Record with 'lyrics_pending' status ---
     try {
-        const { workout, musicStyle, name } = req.body;
+        const { workout, musicStyle, customStyle, tone, language, name } = req.body;
         const defaultTitle = `${workout || 'Workout'} - ${musicStyle || 'Song'}`;
 
         const insertSongSql = `
-            INSERT INTO songs (user_id, workout_input, style_input, name_input, title, status)
-            VALUES ($1, $2, $3, $4, $5, 'lyrics_pending')
+            INSERT INTO songs (user_id, workout_input, style_input, custom_style,tone_input,language_input, name_input, title, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'lyrics_pending')
             RETURNING id`;
-        const insertResult = await query(insertSongSql, [userId, workout, musicStyle, name, defaultTitle]);
+        const insertResult = await query(insertSongSql, [userId, workout, musicStyle, customStyle, tone, language, name, defaultTitle]);
         const songId = insertResult.rows[0].id;
         console.log(`Created song record ID: ${songId} with status 'lyrics_pending'.`);
 
@@ -247,7 +247,7 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
     try {
       // 1) Fetch one pending song
       const findSql = `
-        SELECT id, workout_input, style_input, name_input
+        SELECT id, workout_input, style_input, custom_style, tone_input, language_input,
         FROM songs
         WHERE status = 'lyrics_pending'
         ORDER BY created_at ASC
@@ -261,7 +261,21 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
         return res.status(200).json({ message: "No pending lyrics found." });
       }
   
-      const { id: songId, workout_input: workout, style_input: musicStyle, name_input: name } = songToProcess;
+      const {
+        id: songId,
+        workout_input: workout,
+        style_input: styleInput,
+        custom_style: customStyleStored,
+        tone_input: toneStored,
+        language_input: languageStored,
+        name_input: name
+      } = songToProcess;
+
+      // fallback logic
+      const styleToUse    = customStyleStored || styleInput;
+      const toneToUse     = toneStored      || 'Inspiring';
+      const languageToUse = languageStored  || 'English';
+
       console.log(`Cron Job: Found pending song ID: ${songId}. Attempting to process.`);
   
       // 2) Mark as processing
@@ -270,14 +284,14 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
   
       // 3) Prepare & send OpenAI request
       const openAiPayload = {
-        model: "gpt-3.5-turbo",
+        model: "gpt-4",
         messages: [{
           role: "user",
-          content: `Write a high-quality motivational song (3–4 minutes long) for athlete ${name || 'the athlete'}, who is preparing for the event: ${workout || 'a major athletic challenge'}. 
+          content: `Write a high-quality ${languageToUse}-language motivational song (3–4 minutes long) for athlete ${name || 'the athlete'}, who is preparing for the event: ${workout || 'a major athletic challenge'}. 
 
-The emotional tone should be 'gritty, cinematic, and inspiring'. Use the following key phrases or slogans in the lyrics: "No mercy, no quit".
+The emotional tone should be ${toneToUse}, 'gritty, cinematic, and inspiring'. Use the following key phrases or slogans in the lyrics: "No mercy, no quit".
 
-The song should follow the style of ${musicStyle || 'motivational'}, with intense energy, emotionally resonant imagery, and a strong lyrical rhythm. 
+The song should follow the style of ${styleToUse}, with intense energy, emotionally resonant imagery, and a strong lyrical rhythm. 
 
 Structure the song with:
 - An intro (spoken or low-energy to build anticipation)
@@ -351,7 +365,7 @@ router.all('/cron/process-audio-queue', async (req, res) => {
     try {
       // 1. Find a song that is pending audio generation
       const findSql = `
-        SELECT id, user_id, workout_input, style_input, name_input, lyrics, title
+        SELECT id, workout_input, style_input, custom_style, tone_input, language_input, name_input
         FROM songs
         WHERE status = 'audio_pending'
         ORDER BY created_at ASC

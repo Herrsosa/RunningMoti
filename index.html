@@ -80,6 +80,39 @@
                             </div>
                             <div class="invalid-feedback" id="tone-error">Please select a music style.</div>
                         </div>
+
+                        <div class="mt-3">
+                          <label for="customStyleInput" class="form-label">Or enter a custom style:</label>
+                          <input type="text" id="customStyleInput" name="customStyle" class="form-control" placeholder="e.g. Jazz Fusion, Chiptune">
+                        </div>
+
+                        <!-- Tone selector -->
+                        <div class="mt-3">
+                          <label for="toneInput" class="form-label">Select Tone:</label>
+                          <select id="toneInput" class="form-select">
+                            <option value="">(default: Inspiring)</option>
+                            <option>Melancholic</option>
+                            <option>Triumphant</option>
+                            <option>Peaceful</option>
+                            <option>Aggressive</option>
+                          </select>
+                        </div>
+
+                        <!-- Language selector -->
+                        <div class="mt-3">
+                          <label for="languageInput" class="form-label">Song Language:</label>
+                          <select id="languageInput" class="form-select">
+                            <option>English</option>
+                            <option>Spanish</option>
+                            <option>German</option>
+                            <option>French</option>
+                            <option>Custom…</option>
+                          </select>
+                          <input type="text" id="customLanguageInput" class="form-control mt-2" 
+                                placeholder="Other language" style="display:none;">
+                        </div>
+
+
                          <!-- Credit Cost Info -->
                          <div class="text-center text-muted mb-3" id="creditCostInfo" style="font-size: 0.9em;">
                              Generating a song costs 1 credit.
