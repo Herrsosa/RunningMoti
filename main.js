@@ -564,70 +564,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 }); // End of Promise for lyrics polling
 
                 // --- Step 3: Initiate Audio Generation (Backend sets status to audio_pending) ---
-                loadingMessage.textContent = "Initiating audio generation...";
-                await apiRequest('/generate/generate-audio', 'POST', { songId }); // Only need songId
-                console.log(`Audio generation initiated for song ID: ${songId}. Starting audio status poll.`);
+                loadingMessage.textContent = "Audio queued! It'll appear in your library shortly (1-2 minutes).";
+                await apiRequest('/generate/generate-audio', 'POST', { songId });
+                console.log(`Audio queued for song ${songId}.`);
 
-                // --- Step 4: Poll for Audio Status (First by songId, then by sunoTaskId) ---
-                loadingMessage.textContent = "Generating audio (waiting for background job)...";
-                let audioPollCount = 0;
-                const maxAudioPolls = 90; // Poll for ~4.5 minutes max for audio (includes potential Suno time)
+                // Hide spinner & progress bar, re‑enable button
+                loadingIndicator.style.display = 'none';
+                if (progressContainer)    progressContainer.style.display = 'none';
+                if (generationProgress)   generationProgress.value = 0;
+                motivateButton.disabled = false;
+                motivateButton.textContent = `MOTIVATE (1 Credit)`;
 
-                sunoTaskId = await new Promise((resolve, reject) => {
-                     audioPollInterval = setInterval(async () => {
-                        audioPollCount++;
-                        if (audioPollCount > maxAudioPolls) {
-                            clearInterval(audioPollInterval);
-                            reject(new Error("Audio generation timed out. Please check the library later."));
-                            return;
-                        }
+                // Switch to Library tab and refresh it
+                const libTabLink = document.querySelector('a[href="#libraryTab"]');
+                if (libTabLink) {
+                libTabLink.click();
+                loadLibrary();
+                }
 
-                        try {
-                            // Poll the NEW audio status endpoint first
-                            const statusData = await apiRequest(`/generate/audio-status/${songId}`, 'GET');
-                            console.log(`Polling audio status for ${songId}:`, statusData);
-
-                            // Update UI message based on status
-                            switch(statusData.status) {
-                                case 'complete': loadingMessage.textContent = `Audio generation complete!`; break;
-                                case 'processing': loadingMessage.textContent = `Generating audio... (Suno Processing)`; break;
-                                case 'audio_processing': loadingMessage.textContent = `Generating audio... (Submitting to Suno)`; break;
-                                case 'audio_pending': loadingMessage.textContent = `Generating audio... (Waiting for background job)`; break;
-                                case 'lyrics_complete': loadingMessage.textContent = `Generating audio... (Lyrics ready)`; break; // Should transition quickly
-                                case 'error': loadingMessage.textContent = `Audio generation failed.`; break;
-                                default: loadingMessage.textContent = `Generating audio... (Status: ${statusData.status || 'unknown'})`;
-                            }
-
-                            if (progressContainer && generationProgress) {
-                                progressContainer.style.display = 'block';
-                                generationProgress.value = statusToPercent(statusData.status);
-                            }
-
-                            // Check if Suno Task ID is available and status is 'processing'
-                            if (statusData.suno_task_id && statusData.status === 'processing') {
-                                clearInterval(audioPollInterval); // Stop this poll
-                                resolve(statusData.suno_task_id); // Resolve with the task ID
-                            } else if (statusData.status === 'complete' || statusData.status === 'error' || statusData.status === 'lyrics_error') {
-                                // If it's already complete or errored out before getting task ID
-                                clearInterval(audioPollInterval);
-                                if (statusData.status === 'complete') {
-                                     // Should ideally not happen without task ID, but handle defensively
-                                     resolve(null); // Indicate completion but no task ID for final poll
-                                } else {
-                                     reject(new Error("Audio generation failed before processing started."));
-                                }
-                            }
-                            // Otherwise, continue polling ('audio_pending', 'audio_processing')
-
-                        } catch (pollErr) {
-                            console.warn(`Audio status polling attempt ${audioPollCount} failed: ${pollErr.message || pollErr}.`);
-                            if (pollErr.message?.includes("session has expired") || pollErr.status === 403 || pollErr.status === 404) {
-                                clearInterval(audioPollInterval); reject(pollErr);
-                            }
-                        }
-                    }, 5000); // Poll every 5 seconds for audio status / task ID
-                }); // End of Promise for audio polling (getting task ID)
-
+                // We're done here—return early so we don't hit any further code
+                return;
 
                 // --- Step 5: Poll for Final Audio Result using Suno Task ID (if obtained) ---
                 if (!sunoTaskId) {
