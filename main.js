@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const progressContainer    = document.getElementById('progressContainer');
     const generationProgress   = document.getElementById('generationProgress');
 
+
     // Generator Form Elements
     const songForm = document.getElementById('songForm');
     const nameInput = document.getElementById('nameInput');
@@ -46,6 +47,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const generalErrorDiv = document.getElementById('generalError');
     const workoutErrorDiv = document.getElementById('workout-error');
     const toneErrorDiv = document.getElementById('tone-error');
+    const customStyleInput    = document.getElementById('customStyleInput');
+    const toneInput           = document.getElementById('toneInput');
+    const languageInput       = document.getElementById('languageInput');
+    const customLanguageInput = document.getElementById('customLanguageInput');
+
+    // ─── New: Show/Hide Custom Language Field ────────
+    languageInput.addEventListener('change', () => {
+    customLanguageInput.style.display =
+        languageInput.value === 'Custom…' ? 'block' : 'none';
+    });
+
+    // ─── Existing Signup/Login Listeners ─────────────
+    if (signupForm) {
+    signupForm.addEventListener('submit', (e) => {
+        /* … */
+    });
+    }
+    if (loginForm) {
+    loginForm.addEventListener('submit', (e) => {
+        /* … */
+    });
+    }
+
+    // ─── Finally: Song Generation Submit Handler ──────
+    if (songForm) {
+    songForm.addEventListener('submit', async (e) => {
+        /* compute musicStyle, tone, language, then call apiRequest… */
+    });
+    }
+
 
     // Bootstrap Modals Instances
     let loginModalInstance, signupModalInstance;
@@ -491,7 +522,17 @@ document.addEventListener('DOMContentLoaded', function () {
             motivateButton.textContent = "GENERATING..."; // Update button text
 
             const workout = workoutInput.value.trim();
-            const musicStyle = musicStyleInput.value;
+            const musicStyle = customStyleInput.value.trim()
+                ? customStyleInput.value.trim()
+                : musicStyleInput.value;
+
+                // Pick tone (default to “Inspiring” if none selected)
+            const tone = toneInput.value || 'Inspiring';
+
+                // Pick language: use dropdown or custom text, defaulting to English
+            const language = languageInput.value !== 'Custom…'
+                ? languageInput.value
+                : (customLanguageInput.value.trim() || 'English');
             const name = nameInput ? nameInput.value.trim() : ''; // Handle optional name input
 
             let lyricsPollInterval; // Interval for lyrics status
@@ -507,7 +548,7 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 // --- Step 1: Initiate Lyric Generation (Backend creates pending record) ---
                 loadingMessage.textContent = "Initiating lyric generation...";
-                const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, name });
+                const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, tone, language, name });
                 songId = initiateLyricsResponse.songId; // Get the song ID
                 console.log(`Lyric generation initiated for song ID: ${songId}. Starting status poll.`);
 
