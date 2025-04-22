@@ -310,7 +310,7 @@ Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
         },
-        timeout: 9000
+        timeout: 60000
       };
   
       console.log(`Cron Job: Requesting lyrics from OpenAI for song ${songId}…`);
