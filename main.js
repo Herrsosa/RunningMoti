@@ -70,13 +70,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     }
 
-    // ─── Finally: Song Generation Submit Handler ──────
-    if (songForm) {
-    songForm.addEventListener('submit', async (e) => {
-        /* compute musicStyle, tone, language, then call apiRequest… */
-    });
-    }
-
 
     // Bootstrap Modals Instances
     let loginModalInstance, signupModalInstance;
@@ -456,6 +449,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     handleButtonGroupClick(toneButtonsContainer, musicStyleInput, toneErrorDiv, toneButtonsContainer);
 
+    // When they type their own style again, clear the error
+    customStyleInput.addEventListener('input', () => {
+        customStyleInput.classList.remove('is-invalid');
+        toneButtonsContainer.classList.remove('is-invalid');
+        toneErrorDiv.style.display = 'none';
+    });
+
     // Text input validation clear
     if(workoutInput && workoutErrorDiv) {
         workoutInput.addEventListener('input', () => {
@@ -506,9 +506,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 workoutErrorDiv.style.display = 'block';
                 isValid = false;
             }
-            if (!musicStyleInput.value && !customStyleInput.value.trim()) {
-                // No pre‐chosen style *and* no custom style ⇒ error
-                if (toneButtonsContainer) toneButtonsContainer.classList.add('is-invalid');
+            if (!musicStyleInput.value.trim() && !customStyleInput.value.trim()) {
+                // highlight both the preset buttons and the custom‑style input to indicate “pick one”
+                toneButtonsContainer.classList.add('is-invalid');
+                customStyleInput.classList.add('is-invalid');
+                toneErrorDiv.textContent = "Please select a style or enter a custom one.";
                 toneErrorDiv.style.display = 'block';
                 isValid = false;
             }

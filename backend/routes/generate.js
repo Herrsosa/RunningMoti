@@ -247,7 +247,7 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
     try {
       // 1) Fetch one pending song
       const findSql = `
-        SELECT id, workout_input, style_input, custom_style, tone_input, language_input,
+        SELECT id, workout_input, style_input, custom_style, tone_input, language_input, name_input
         FROM songs
         WHERE status = 'lyrics_pending'
         ORDER BY created_at ASC
