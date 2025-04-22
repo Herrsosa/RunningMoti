@@ -506,8 +506,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 workoutErrorDiv.style.display = 'block';
                 isValid = false;
             }
-            if (!musicStyleInput.value) {
-                if(toneButtonsContainer) toneButtonsContainer.classList.add('is-invalid');
+            if (!musicStyleInput.value && !customStyleInput.value.trim()) {
+                // No pre‐chosen style *and* no custom style ⇒ error
+                if (toneButtonsContainer) toneButtonsContainer.classList.add('is-invalid');
                 toneErrorDiv.style.display = 'block';
                 isValid = false;
             }
@@ -525,7 +526,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const musicStyle = customStyleInput.value.trim()
                 ? customStyleInput.value.trim()
                 : musicStyleInput.value;
-
+            
+            const customStyle = customStyleInput.value.trim();   
                 // Pick tone (default to “Inspiring” if none selected)
             const tone = toneInput.value || 'Inspiring';
 
@@ -533,6 +535,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const language = languageInput.value !== 'Custom…'
                 ? languageInput.value
                 : (customLanguageInput.value.trim() || 'English');
+            
             const name = nameInput ? nameInput.value.trim() : ''; // Handle optional name input
 
             let lyricsPollInterval; // Interval for lyrics status
@@ -548,7 +551,7 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 // --- Step 1: Initiate Lyric Generation (Backend creates pending record) ---
                 loadingMessage.textContent = "Initiating lyric generation...";
-                const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle, tone, language, name });
+                const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle,customStyle, tone, language, name });
                 songId = initiateLyricsResponse.songId; // Get the song ID
                 console.log(`Lyric generation initiated for song ID: ${songId}. Starting status poll.`);
 
