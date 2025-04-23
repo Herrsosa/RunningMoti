@@ -365,7 +365,7 @@ router.all('/cron/process-audio-queue', async (req, res) => {
     try {
       // 1. Find a song that is pending audio generation
       const findSql = `
-        SELECT id, user_id, workout_input, style_input, custom_style, tone_input, language_input, name_input
+        SELECT id, user_id, lyrics, title, workout_input, style_input, custom_style, tone_input, language_input, name_input
         FROM songs
         WHERE status = 'audio_pending'
         ORDER BY created_at ASC
@@ -420,7 +420,7 @@ router.all('/cron/process-audio-queue', async (req, res) => {
         style: musicStyle?.slice(0, 200) || '',
         title: defaultTitle?.slice(0, 80) || 'Untitled',
         prompt: lyrics?.slice(0, 3000) || '',
-        callBackUrl: callbackUrl
+        callbackUrl: callbackUrl
       };
   
       const sunoConfig = {
