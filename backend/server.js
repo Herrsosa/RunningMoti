@@ -1,3 +1,7 @@
+// as early as possible, before any other requires:
+require("dotenv").config();
+console.log("▶ MAILERSEND_API_KEY is set?", !!process.env.MAILERSEND_API_KEY);
+
 // backend/server.js
 const express = require('express');
 const cors = require('cors');
