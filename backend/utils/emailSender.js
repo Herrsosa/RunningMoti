@@ -45,6 +45,8 @@ const sendVerificationEmail = async (toEmail, token) => {
         // Optional: Add Reply-To, CC, BCC, Tags etc.
         // .setReplyTo(sentFrom)
         // .setTags(["verification", "signup"])
+    
+    console.log("▶ [sendVerificationEmail] MAILERSEND_API_KEY:", !!process.env.MAILERSEND_API_KEY);
 
     try {
         console.log(`Sending verification email via MailerSend to ${toEmail}...`);
