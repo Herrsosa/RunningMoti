@@ -289,7 +289,7 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
           role: "user",
           content: `Write a high-quality ${languageToUse}-language motivational song (3–4 minutes long) for athlete ${name || 'the athlete'}, who is preparing for the event: ${workout || 'a major athletic challenge'}. 
 
-The emotional tone should be ${toneToUse}, 'gritty, cinematic, and inspiring'. Use the following key phrases or slogans in the lyrics: "No mercy, no quit".
+The emotional tone should be ${toneToUse}, 'cinematic, and inspiring'.
 
 The song should follow the style of ${styleToUse}, with intense energy, emotionally resonant imagery, and a strong lyrical rhythm. 
 
