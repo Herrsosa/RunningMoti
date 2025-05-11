@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const loggedOutCTA = document.getElementById('loggedOutCTA'); // Get CTA div reference
     const progressContainer    = document.getElementById('progressContainer');
     const generationProgress   = document.getElementById('generationProgress');
+    const exampleSongsSection = document.getElementById('exampleSongsSection');
 
 
     // Generator Form Elements
@@ -89,45 +90,79 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Utility Functions ---
     const updateUIBasedOnLoginState = () => {
-        if (!userInfoDiv || !authButtonsDiv || !appContainer || !usernameDisplay || !creditsDisplay) {
-            console.error("Core UI elements not found. Check HTML IDs.");
-            return; // Prevent errors if elements are missing
+        // Ensure core UI elements for auth state changes are present
+        if (!userInfoDiv || !authButtonsDiv || !usernameDisplay || !creditsDisplay) {
+            console.error("Core auth UI elements not found. Check HTML IDs for userInfo, authButtons, usernameDisplay, creditsDisplay.");
+            // No return here, as other parts of the UI might still need updating
         }
-
+    
+        // Elements that are shown/hidden based on login state
+        const elementsToToggle = [appContainer, loggedOutCTA, exampleSongsSection];
+    
         if (currentUser.token) {
-            userInfoDiv.style.display = 'block';
-            authButtonsDiv.style.display = 'none';
-            appContainer.style.display = 'block';
-            if(loggedOutCTA) loggedOutCTA.style.display = 'none'; // Hide CTA when logged in
-
-            usernameDisplay.textContent = currentUser.username || 'User';
-            creditsDisplay.textContent = currentUser.credits;
+            // --- USER IS LOGGED IN ---
+            if (userInfoDiv) userInfoDiv.style.display = 'block';
+            if (authButtonsDiv) authButtonsDiv.style.display = 'none';
+            if (appContainer) appContainer.style.display = 'block';
+            if (loggedOutCTA) loggedOutCTA.style.display = 'none';
+    
+            // Hide example songs if user is logged in
+            if (exampleSongsSection) {
+                exampleSongsSection.style.display = 'none';
+            }
+    
+            if (usernameDisplay) usernameDisplay.textContent = currentUser.username || 'User';
+            if (creditsDisplay) creditsDisplay.textContent = currentUser.credits;
+    
             fetchUserProfile(); // Fetch latest credits/info
-            // Only load library if library elements exist
-            if(libraryContent) {
+    
+            // Only load library if library elements exist and the library tab is currently active (or default)
+            // This prevents unnecessary loads if the user is on the generator tab
+            const libraryTabLink = appTabs ? appTabs.querySelector('a.nav-link[href="#libraryTab"]') : null;
+            if (libraryContent && libraryTabLink && libraryTabLink.classList.contains('active')) {
                 loadLibrary();
             }
+    
         } else {
-            userInfoDiv.style.display = 'none';
-            authButtonsDiv.style.display = 'block';
-            appContainer.style.display = 'none';
-            if(loggedOutCTA) loggedOutCTA.style.display = 'block'; // Show CTA when logged out
-
+            // --- USER IS LOGGED OUT ---
+            if (userInfoDiv) userInfoDiv.style.display = 'none';
+            if (authButtonsDiv) authButtonsDiv.style.display = 'block';
+            if (appContainer) appContainer.style.display = 'none';
+            if (loggedOutCTA) loggedOutCTA.style.display = 'block';
+    
+            // Show example songs if user is logged out
+            if (exampleSongsSection) {
+                exampleSongsSection.style.display = 'block';
+            }
+    
             // Clear library if elements exist
-             if(libraryContent && libraryLoading && libraryEmpty) {
+            if (libraryContent && libraryLoading && libraryEmpty) {
                 libraryContent.innerHTML = '';
-                libraryLoading.style.display = 'block';
+                // For logged out state, perhaps don't show loading or empty messages for library
+                libraryLoading.style.display = 'none';
                 libraryEmpty.style.display = 'none';
-             }
+            }
         }
-        // Reset forms and errors
-        if(loginErrorDiv) loginErrorDiv.style.display = 'none';
-        if(signupErrorDiv) signupErrorDiv.style.display = 'none';
-        if(loginForm) loginForm.reset();
-        if(signupForm) signupForm.reset();
-        if(generalErrorDiv) generalErrorDiv.style.display = 'none';
-        if(loadingIndicator) loadingIndicator.style.display = 'none';
-        if(audioResultContainer) audioResultContainer.style.display = 'none';
+    
+        // Reset forms and errors (common to both states, or after state change)
+        if (loginErrorDiv) loginErrorDiv.style.display = 'none';
+        if (signupErrorDiv) signupErrorDiv.style.display = 'none';
+        if (loginForm) loginForm.reset();
+        if (signupForm) signupForm.reset();
+    
+        // Reset generator UI elements if they exist
+        if (generalErrorDiv) generalErrorDiv.style.display = 'none';
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+        if (audioResultContainer) audioResultContainer.style.display = 'none';
+        if (progressContainer) progressContainer.style.display = 'none'; // Also hide progress bar
+        if (generationProgress) generationProgress.value = 0; // Reset progress bar value
+        if (lyricsOutput) lyricsOutput.textContent = ''; // Clear old lyrics
+        if (motivateButton) { // Reset motivate button
+            motivateButton.disabled = false;
+            const CREDITS_PER_SONG = 1; // Make sure this is defined or fetched if dynamic
+            motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`;
+        }
+        if(songForm) songForm.reset(); // Reset the main song form
     };
 
     const showApiError = (errorDiv, error, defaultMessage = "An error occurred.") => {

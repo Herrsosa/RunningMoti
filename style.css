@@ -547,3 +547,69 @@ input[type="hidden"] {
 .button:hover {
     background: #4054b2;
 }
+
+
+/* style.css */
+
+/* ... your existing styles ... */
+
+/* === Example Songs Section === */
+#exampleSongsSection {
+    background-color: rgba(0, 0, 0, 0.3); /* Slightly transparent dark background for the section */
+    border-top: 1px solid rgba(255, 255, 255, 0.1); /* Subtle top border */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Subtle bottom border */
+}
+
+#exampleSongsSection h2 {
+    font-weight: 300; /* Lighter font weight for the heading */
+    letter-spacing: 1px;
+}
+
+.example-song-card {
+    background-color: #2c3034; /* A slightly lighter dark than pure #212529 for contrast */
+    border: 1px solid rgba(255, 255, 255, 0.08); /* Faint border for cards */
+    /* box-shadow is already applied via Bootstrap .shadow-sm, but you can override if desired */
+    /* e.g., box-shadow: 0 4px 8px rgba(0,0,0,0.2); */
+    transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
+}
+
+.example-song-card:hover {
+    transform: translateY(-6px) scale(1.02); /* Slightly more lift and subtle scale */
+    box-shadow: 0 8px 16px rgba(0,0,0,0.25); /* More pronounced shadow on hover */
+}
+
+.example-song-card h5 {
+    color: #e9ecef; /* Slightly off-white for title */
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.example-song-card p.small {
+    font-size: 0.875em;
+    color: #adb5bd; /* Bootstrap's muted color */
+    line-height: 1.4;
+}
+
+.example-song-card audio {
+    border-radius: 5px; /* Consistent border radius */
+    margin-top: 1rem;
+    /* Customizing HTML5 audio player is notoriously hard across browsers.
+       These are some common filter tricks, but may not look perfect everywhere. */
+    /* filter: invert(1) hue-rotate(180deg) contrast(0.9) saturate(0.7); */
+}
+
+/* Optional: Style for the audio player to better match dark theme */
+.example-song-card audio::-webkit-media-controls-panel {
+  background-color: #343a40; /* Darker panel */
+  border-radius: 5px;
+}
+.example-song-card audio::-webkit-media-controls-play-button,
+.example-song-card audio::-webkit-media-controls-volume-slider,
+.example-song-card audio::-webkit-media-controls-mute-button,
+.example-song-card audio::-webkit-media-controls-timeline,
+.example-song-card audio::-webkit-media-controls-current-time-display,
+.example-song-card audio::-webkit-media-controls-time-remaining-display {
+  /* filter: brightness(1.5) contrast(0.8) saturate(0.5); You might need to adjust values */
+  color: #ced4da; /* For text elements if controllable */
+}
+/* Firefox specific styling is different and harder to achieve full consistency */
