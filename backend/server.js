@@ -3,6 +3,7 @@ require("dotenv").config();
 console.log("▶ MAILERSEND_API_KEY is set?", !!process.env.MAILERSEND_API_KEY);
 
 // backend/server.js
+console.log("--- Loading backend/server.js ---"); // Add top-level log
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -25,6 +26,11 @@ app.use(cors()); // Consider more restrictive CORS settings for production
 app.use(express.json()); // For parsing application/json
 app.use(express.urlencoded({ extended: true })); // If using callbacks via form post
 
+// --- Serve Static Files for Local Development ---
+// This will serve files from the 'public' directory at the root level
+// e.g., a request to /audio/example.mp3 will serve ../public/audio/example.mp3
+app.use(express.static(path.join(__dirname, '../public')));
+
 // Special handling for Stripe webhooks
 // Note: Ensure this path matches your Stripe webhook configuration if it's different
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
@@ -32,7 +38,10 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 // --- API Routes ---
 // Vercel handles serving static files (index.html, etc.) from the root.
 // Express only needs to handle the API endpoints.
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', (req, res, next) => { // Add logging middleware
+    console.log(`--- Request received for /api/auth${req.path} ---`);
+    next(); // Pass control to authRoutes
+}, authRoutes);
 app.use('/api/generate', generateRoutes); // Prefix generate routes
 app.use('/api/library', libraryRoutes);  // Prefix library routes
 app.use('/api/stripe', stripeRoutes);    // Add Stripe routes
