@@ -122,7 +122,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (libraryContent && libraryTabLink && libraryTabLink.classList.contains('active')) {
                 loadLibrary();
             }
-    
         } else {
             // --- USER IS LOGGED OUT ---
             if (userInfoDiv) userInfoDiv.style.display = 'none';
@@ -156,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (audioResultContainer) audioResultContainer.style.display = 'none';
         if (progressContainer) progressContainer.style.display = 'none'; // Also hide progress bar
         if (generationProgress) generationProgress.value = 0; // Reset progress bar value
-        if (lyricsOutput) lyricsOutput.textContent = ''; // Clear old lyrics
+        if (lyricsOutput) lyricsOutput.textContent = '';
         if (motivateButton) { // Reset motivate button
             motivateButton.disabled = false;
             const CREDITS_PER_SONG = 1; // Make sure this is defined or fetched if dynamic
@@ -542,7 +541,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 isValid = false;
             }
             if (!musicStyleInput.value.trim() && !customStyleInput.value.trim()) {
-                // highlight both the preset buttons and the custom‑style input to indicate “pick one”
+                // highlight both the preset buttons and the custom‑style input to indicate "pick one"
                 toneButtonsContainer.classList.add('is-invalid');
                 customStyleInput.classList.add('is-invalid');
                 toneErrorDiv.textContent = "Please select a style or enter a custom one.";
@@ -565,7 +564,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 : musicStyleInput.value;
             
             const customStyle = customStyleInput.value.trim();   
-                // Pick tone (default to “Inspiring” if none selected)
+                // Pick tone (default to "Inspiring" if none selected)
             const tone = toneInput.value || 'Inspiring';
 
                 // Pick language: use dropdown or custom text, defaulting to English
