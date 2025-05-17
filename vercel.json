@@ -6,7 +6,8 @@
       "use": "@vercel/node",
       "config": { "maxDuration": 60 }
     },
-    { "src": "*.{html,css,js,png,mp3}", "use": "@vercel/static" }
+    { "src": "*.{html,css,js,png,mp3}", "use": "@vercel/static" },
+    { "src": "public/audio/*.mp3", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/server.js" },
