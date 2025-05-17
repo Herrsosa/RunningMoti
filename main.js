@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
          switch(song.status) {
              case 'complete':
                  statusOrPlayerHtml = song.audio_url
-                    ? `<audio controls src="${song.audio_url}" class="library-audio-player"></audio>`
+                    ? `<audio controls src="${song.audio_url.startsWith('/') ? song.audio_url : '/' + song.audio_url}" class="library-audio-player"></audio>`
                     : `<span class="badge bg-success">Complete (Processing Audio URL...)</span>`; // Or show warning if URL missing unexpectedly
                  break;
              case 'processing': // Suno job submitted, waiting for callback/completion
