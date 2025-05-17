@@ -10,6 +10,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/server.js" },
+    { "src": "/audio/(.*)", "dest": "public/audio/$1" },
     { "src": "/(.*)",     "dest": "/$1" }
   ],
   "crons": [
