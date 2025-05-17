@@ -6,11 +6,11 @@
       "use": "@vercel/node",
       "config": { "maxDuration": 60 }
     },
-    { "src": "public/**", "use": "@vercel/static" }
+    { "src": "*.{html,css,js,png,mp3}", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/server.js" },
-    { "src": "/(.*)", "dest": "/public/$1" }
+    { "src": "/(.*)",     "dest": "/$1" }
   ],
   "crons": [
     { "path": "/api/generate/cron/process-lyrics-queue", "schedule": "* * * * *" },
