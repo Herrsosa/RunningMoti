@@ -438,19 +438,53 @@ document.addEventListener('DOMContentLoaded', function () {
                  break;
          }
 
-         item.innerHTML = `
-            <div class="library-item-info">
-                <h5>${song.title || 'Untitled Song'}</h5>
-                <p>Workout: ${song.workout_input || 'N/A'}<br>Style: ${song.style_input || 'N/A'} | Date: ${formattedDate}</p>
-            </div>
-            <div class="library-item-controls">
-                ${statusOrPlayerHtml}
-                ${!['lyrics_pending', 'lyrics_processing', 'audio_pending', 'audio_processing', 'processing'].includes(song.status) ? // Only show delete for final/error states
-                    `<button class="btn btn-sm btn-outline-danger btn-delete-song" data-song-id="${song.id}" title="Delete Song">X</button>` : ''
-                }
-            </div>
-        `;
-        libraryContent.appendChild(item);
+         // Create elements programmatically for better control
+         const itemInfoDiv = document.createElement('div');
+         itemInfoDiv.className = 'library-item-info';
+         itemInfoDiv.innerHTML = `
+             <h5>${song.title || 'Untitled Song'}</h5>
+             <p>Workout: ${song.workout_input || 'N/A'}<br>Style: ${song.style_input || 'N/A'} | Date: ${formattedDate}</p>
+         `;
+
+         const itemControlsDiv = document.createElement('div');
+         itemControlsDiv.className = 'library-item-controls';
+
+         // Add status or player
+         if (song.status === 'complete' && song.audio_url) {
+             const audioEl = document.createElement('audio');
+             audioEl.controls = true;
+             audioEl.className = 'library-audio-player';
+             audioEl.src = song.audio_url.startsWith('/') ? song.audio_url : '/' + song.audio_url;
+             itemControlsDiv.appendChild(audioEl);
+         } else {
+             const statusSpan = document.createElement('span');
+             statusSpan.className = `badge ${song.status === 'error' || song.status === 'lyrics_error' ? 'bg-danger' : song.status === 'complete' ? 'bg-success' : song.status.includes('lyrics') ? 'bg-light text-dark' : 'bg-secondary'}`;
+             statusSpan.textContent = song.status === 'complete' ? 'Complete (Processing Audio URL...)' :
+                                      song.status === 'processing' ? 'Generating Audio...' :
+                                      song.status === 'audio_processing' ? 'Submitting Audio Job...' :
+                                      song.status === 'audio_pending' ? 'Audio Generation Queued...' :
+                                      song.status === 'lyrics_complete' ? 'Lyrics Ready' :
+                                      song.status === 'lyrics_processing' ? 'Generating Lyrics...' :
+                                      song.status === 'lyrics_pending' ? 'Lyrics Queued...' :
+                                      song.status === 'lyrics_error' ? 'Lyrics Error' :
+                                      song.status === 'error' ? 'Error' : 'Unknown Status';
+             itemControlsDiv.appendChild(statusSpan);
+         }
+
+         // Add delete button if applicable
+         if (!['lyrics_pending', 'lyrics_processing', 'audio_pending', 'audio_processing', 'processing'].includes(song.status)) {
+             const deleteButton = document.createElement('button');
+             deleteButton.className = 'btn btn-sm btn-outline-danger btn-delete-song';
+             deleteButton.dataset.songId = song.id;
+             deleteButton.title = 'Delete Song';
+             deleteButton.textContent = 'X';
+             itemControlsDiv.appendChild(deleteButton);
+         }
+
+         item.appendChild(itemInfoDiv);
+         item.appendChild(itemControlsDiv);
+
+         libraryContent.appendChild(item);
     };
 
      const handleDeleteSong = async (songId) => {
