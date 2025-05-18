@@ -715,6 +715,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (libraryContent) {
                             libraryContent.style.pointerEvents = 'auto';
                         }
+                        console.log('Audio generation modal timeout finished');
                     }, 3000);
                 }
 
@@ -778,7 +779,9 @@ document.addEventListener('DOMContentLoaded', function () {
      if (appTabs && libraryContent) {
          appTabs.addEventListener('shown.bs.tab', function (event) {
              if (event.target.getAttribute('href') === '#libraryTab') {
+                 console.log('Library tab shown, calling loadLibrary...');
                  loadLibrary(); // Reload library when tab becomes active
+                 console.log('loadLibrary called from tab listener');
              }
          });
      }
