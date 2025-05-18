@@ -149,19 +149,21 @@ document.addEventListener('DOMContentLoaded', function () {
         if (loginForm) loginForm.reset();
         if (signupForm) signupForm.reset();
     
-        // Reset generator UI elements if they exist
-        if (generalErrorDiv) generalErrorDiv.style.display = 'none';
-        if (loadingIndicator) loadingIndicator.style.display = 'none';
-        if (audioResultContainer) audioResultContainer.style.display = 'none';
-        if (progressContainer) progressContainer.style.display = 'none'; // Also hide progress bar
-        if (generationProgress) generationProgress.value = 0; // Reset progress bar value
-        if (lyricsOutput) lyricsOutput.textContent = '';
-        if (motivateButton) { // Reset motivate button
-            motivateButton.disabled = false;
-            const CREDITS_PER_SONG = 1; // Make sure this is defined or fetched if dynamic
-            motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`;
+        // Reset generator UI elements if they exist, ONLY if the generator tab is active
+        if (isGeneratorTabActive()) {
+            if (generalErrorDiv) generalErrorDiv.style.display = 'none';
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+            if (audioResultContainer) audioResultContainer.style.display = 'none';
+            if (progressContainer) progressContainer.style.display = 'none'; // Also hide progress bar
+            if (generationProgress) generationProgress.value = 0; // Reset progress bar value
+            if (lyricsOutput) lyricsOutput.textContent = '';
+            if (motivateButton) { // Reset motivate button
+                motivateButton.disabled = false;
+                const CREDITS_PER_SONG = 1; // Make sure this is defined or fetched if dynamic
+                motivateButton.textContent = `MOTIVATE (${CREDITS_PER_SONG} Credit)`;
+            }
+            if(songForm) songForm.reset(); // Reset the main song form
         }
-        if(songForm) songForm.reset(); // Reset the main song form
     };
 
     const showApiError = (errorDiv, error, defaultMessage = "An error occurred.") => {
