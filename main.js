@@ -1,4 +1,12 @@
 // main.js
+
+// Function to check if the generator tab is active
+const isGeneratorTabActive = () => {
+    const appTabs = document.getElementById('appTabs'); // Need to get this element here
+    const generatorTabLink = appTabs ? appTabs.querySelector('a.nav-link[href="#generatorTab"]') : null;
+    return generatorTabLink && generatorTabLink.classList.contains('active');
+};
+
 document.addEventListener('DOMContentLoaded', function () {
     // --- STATE ---
     let currentUser = {
