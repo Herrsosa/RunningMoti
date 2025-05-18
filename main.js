@@ -592,7 +592,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log(`Lyric generation initiated for song ID: ${songId}. Starting status poll.`);
 
                 // --- Step 2: Poll for Lyrics Status using /lyrics-status endpoint ---
-                loadingMessage.textContent = "Generating lyrics (waiting for background job)...";
+                loadingMessage.textContent = "Generating lyrics (this can take a few minutes)...";
                 let lyricsPollCount = 0;
                 const maxLyricsPolls = 60; // Poll for ~5 minutes max for lyrics (Cron runs every minute)
 
@@ -613,7 +613,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             switch(statusData.status) {
                                 case 'lyrics_complete': loadingMessage.textContent = `Lyrics generated!`; break;
                                 case 'lyrics_processing': loadingMessage.textContent = `Generating lyrics... (Processing)`; break;
-                                case 'lyrics_pending': loadingMessage.textContent = `Generating lyrics... (Waiting for background job)`; break;
+                                case 'lyrics_pending': loadingMessage.textContent = `Generating lyrics... (This can take a few minutes)`; break;
                                 case 'lyrics_error': loadingMessage.textContent = `Lyrics generation failed.`; break;
                                 default: loadingMessage.textContent = `Generating lyrics... (Status: ${statusData.status || 'unknown'})`;
                             }
@@ -658,8 +658,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Switch to Library tab and refresh it
                 const libTabLink = document.querySelector('a[href="#libraryTab"]');
                 if (libTabLink) {
-                libTabLink.click();
-                loadLibrary();
+                    var audioModal = new bootstrap.Modal(document.getElementById('audioGenerationModal'));
+                    audioModal.show();
+                    loadLibrary();
+                    // Automatically hide the advisory modal after 3 seconds to ensure library elements are interactive
+                    setTimeout(() => {
+                        audioModal.hide();
+                        // Ensure modal backdrop is removed and body class reset to allow interaction
+                        document.body.classList.remove('modal-open');
+                        document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+                        // Re-enable pointer events on the library content in case they were blocked
+                        if (libraryContent) {
+                            libraryContent.style.pointerEvents = 'auto';
+                        }
+                    }, 3000);
                 }
 
                 // We're done here—return early so we don't hit any further code
