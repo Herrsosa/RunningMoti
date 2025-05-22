@@ -613,3 +613,14 @@ input[type="hidden"] {
   color: #ced4da; /* For text elements if controllable */
 }
 /* Firefox specific styling is different and harder to achieve full consistency */
+
+/* Style for the "Forgot Password?" link in the login modal */
+#loginModal .modal-body #loginForm .text-end a.small {
+    color: var(--text-light) !important; /* Use your light text color */
+    text-decoration: none; /* Optional: remove underline if Bootstrap adds one */
+  }
+  
+  #loginModal .modal-body #loginForm .text-end a.small:hover {
+    color: var(--primary-blue) !important; /* Optional: change color on hover */
+    text-decoration: underline; /* Optional: add underline on hover */
+  }
