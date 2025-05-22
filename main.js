@@ -454,7 +454,13 @@ document.addEventListener('DOMContentLoaded', function () {
              const audioEl = document.createElement('audio');
              audioEl.controls = true;
              audioEl.className = 'library-audio-player';
-             audioEl.src = song.audio_url.startsWith('/') ? song.audio_url : '/' + song.audio_url;
+             // Check if the URL is already absolute (starts with http or https)
+             if (song.audio_url.startsWith('http://') || song.audio_url.startsWith('https://')) {
+                 audioEl.src = song.audio_url;
+             } else {
+                 // Otherwise, assume it's a relative path and ensure it starts with a '/'
+                 audioEl.src = song.audio_url.startsWith('/') ? song.audio_url : '/' + song.audio_url;
+             }
              itemControlsDiv.appendChild(audioEl);
          } else {
              const statusSpan = document.createElement('span');

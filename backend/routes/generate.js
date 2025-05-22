@@ -124,7 +124,17 @@ router.post('/suno-callback', async (req, res) => {
     let errorMsg = 'Unknown callback status or format.';
 
     if (req.body?.code === 200 && req.body?.data?.callbackType === "complete" && Array.isArray(req.body.data.data) && req.body.data.data.length > 0) {
-        audioUrl = req.body.data.data[0].audio_url;
+        // Get the audio URL from the callback
+        let receivedAudioUrl = req.body.data.data[0].audio_url;
+
+        // Check if the URL has the erroneous '/https:/' prefix and remove it
+        if (receivedAudioUrl && receivedAudioUrl.startsWith('/https:/')) {
+            audioUrl = 'https://' + receivedAudioUrl.substring('/https:/'.length);
+            console.warn(`Corrected malformed audio URL for Song ${songId}: ${receivedAudioUrl} -> ${audioUrl}`);
+        } else {
+            audioUrl = receivedAudioUrl;
+        }
+
         status = 'complete';
         errorMsg = null;
         console.log(`Callback SUCCESS for Song ${songId}: Audio URL found.`);
