@@ -3,80 +3,64 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Motivational Song Generator</title>
-    <!-- Bootstrap CSS -->
+    <title>Athletes Motivation - Personalized Motivational Songs</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
-    <!-- Your Custom CSS -->
     <link rel="stylesheet" href="style.css" />
     <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
-    <!-- Background Elements -->
     <div class="background-image"></div>
     <div class="overlay"></div>
 
-    <!-- Top Navigation / User Area -->
     <nav class="user-nav">
-        <div id="userInfo" style="display: none;"> <!-- Hidden initially -->
+        <div id="userInfo" style="display: none;">
             Welcome, <span id="usernameDisplay">User</span>! | Credits: <span id="creditsDisplay">0</span>
             <button id="logoutButton" class="btn btn-sm btn-outline-light ms-2">Logout</button>
         </div>
-        <div id="authButtons"> <!-- Shown initially -->
+        <div id="authButtons">
             <button id="showLoginBtn" class="btn btn-sm btn-primary me-2">Login</button>
             <button id="showSignupBtn" class="btn btn-sm btn-secondary">Sign Up</button>
         </div>
     </nav>
 
-    <!-- Static Header (Always Visible) -->
     <header class="header-section text-center text-white main-container">
         <h2 class="fuel-fire-text">FUEL YOUR FIRE</h2>
         <h1 class="main-headline mb-4">Get Your Personalized<br/>Motivational Track</h1>
-         <div id="loggedOutCTA" style="display: block;"> <!-- Show initially -->
-             <p class="text-muted" style="color: white !important; font-size: 1.5rem;">Login or Sign Up to start creating your tracks!</p>
-             <!-- You could add a button here too -->
-             <!-- <button class="btn btn-primary create-track-btn" onclick="document.getElementById('showLoginBtn').click();">Login to Create</button> -->
+         <div id="loggedOutCTA" style="display: block;">
+             <p class="text-muted" style="color: white !important; font-size: 1.5rem;">Login or Sign Up to start creating your tracks with Athletes Motivation!</p>
          </div>
     </header>
 
-    <!-- Example Songs Section (Only for Logged-Out Users) -->
-    <section id="exampleSongsSection" class="main-container text-white py-5" style="display: none;"> <!-- Initially hidden -->
-      <div class="container"> <!-- Bootstrap container for nice padding and centering -->
+    <section id="exampleSongsSection" class="main-container text-white py-5" style="display: none;">
+      <div class="container">
           <h2 class="text-center mb-4">Hear What You Can Create!</h2>
           <div class="row">
-              <!-- Example Song 1 -->
               <div class="col-md-4 mb-4">
                   <div class="example-song-card p-3 bg-dark rounded shadow-sm">
                       <h5>Motivating Wakeup Call</h5>
                       <p class="small text-muted mb-2">Style: Epic Electronic | Tone: Triumphant</p>
-<audio controls src="audio/example_song_1.mp3" class="w-100"></audio>
+                      <audio controls src="audio/example_song_1.mp3" class="w-100"></audio>
                   </div>
               </div>
-
-              <!-- Example Song 2 -->
               <div class="col-md-4 mb-4">
                   <div class="example-song-card p-3 bg-dark rounded shadow-sm">
                       <h5>French Spinning Chanson</h5>
                       <p class="small text-muted mb-2">Style: Aggressive Rock | Tone: Intense</p>
-<audio controls src="audio/example_song_2.mp3" class="w-100"></audio>
+                      <audio controls src="audio/example_song_2.mp3" class="w-100"></audio>
                   </div>
               </div>
-
-              <!-- Example Song 3 (Optional) -->
               <div class="col-md-4 mb-4">
                   <div class="example-song-card p-3 bg-dark rounded shadow-sm">
                       <h5>Spanish Ultra Marathon Reggaeton</h5>
                       <p class="small text-muted mb-2">Style: Chill Lo-fi | Tone: Peaceful</p>
-<audio controls src="audio/example_song_3.mp3" class="w-100"></audio>
+                      <audio controls src="audio/example_song_3.mp3" class="w-100"></audio>
                   </div>
               </div>
           </div>
       </div>
     </section>
-    <!-- End Example Songs Section -->
 
-     <!-- Main App Container (Generator/Library - Hidden until login) -->
     <div id="appContainer" class="main-container" style="display: none;">
-         <!-- Tab Navigation -->
          <ul class="nav nav-pills justify-content-center mb-3" id="appTabs">
             <li class="nav-item">
                 <a class="nav-link active" data-bs-toggle="pill" href="#generatorTab">Generator</a>
@@ -85,25 +69,19 @@
                 <a class="nav-link" data-bs-toggle="pill" href="#libraryTab">My Library</a>
             </li>
         </ul>
-
-        <!-- Tab Content -->
         <div class="tab-content">
-            <!-- Generator Tab -->
             <div class="tab-pane fade show active" id="generatorTab">
                 <section class="form-section">
                     <form id="songForm" novalidate>
-                        <!-- Step 1: Name -->
                         <div class="step mb-3">
                             <div class="step-label-container"><span class="step-number">1</span><label for="nameInput" class="step-title">Name (Optional)</label></div>
                             <input type="text" class="form-control custom-input" id="nameInput" name="name" placeholder="Name for the song (e.g., Alex)"/>
                         </div>
-                        <!-- Step 2: Workout Target -->
                         <div class="step mb-3">
                             <div class="step-label-container"><span class="step-number">2</span><label for="workoutInput" class="step-title">Workout Target</label></div>
                             <input type="text" class="form-control custom-input" id="workoutInput" name="workout" placeholder="e.g., 10k run, Bench press PR" required />
                             <div class="invalid-feedback" id="workout-error">Please enter your workout target.</div>
                         </div>
-                        <!-- Step 3: Tone / Music Style -->
                         <div class="step mb-4">
                             <div class="step-label-container"><span class="step-number">3</span><label class="step-title">Music Style / Tone</label></div>
                             <div id="toneButtons" class="button-group">
@@ -116,13 +94,10 @@
                             </div>
                             <div class="invalid-feedback" id="tone-error">Please select a music style.</div>
                         </div>
-
                         <div class="mt-3">
                           <label for="customStyleInput" class="form-label">Or enter a custom style:</label>
                           <input type="text" id="customStyleInput" name="customStyle" class="form-control" placeholder="e.g. Jazz Fusion, Chiptune">
                         </div>
-
-                        <!-- Tone selector -->
                         <div class="mt-3">
                           <label for="toneInput" class="form-label">Select Tone:</label>
                           <select id="toneInput" class="form-select">
@@ -133,8 +108,6 @@
                             <option>Aggressive</option>
                           </select>
                         </div>
-
-                        <!-- Language selector -->
                         <div class="mt-3">
                           <label for="languageInput" class="form-label">Song Language:</label>
                           <select id="languageInput" class="form-select">
@@ -147,27 +120,17 @@
                           <input type="text" id="customLanguageInput" class="form-control mt-2" 
                                 placeholder="Other language" style="display:none;">
                         </div>
-
-
-                         <!-- Credit Cost Info -->
                          <div class="text-center text-muted mb-3" id="creditCostInfo" style="font-size: 0.9em;">
                              Generating a song costs 1 credit.
                          </div>
-                        <!-- Submit Button -->
                         <button type="submit" id="motivateButton" class="btn motivate-button w-100 mt-2">MOTIVATE (1 Credit)</button>
-                        
-                         <!-- Progress bar (hidden until generation starts) -->
                         <div id="progressContainer" style="display:none; margin:1rem 0;">
                         <progress id="generationProgress" max="100" value="0" style="width:100%;"></progress>
                         </div>
-                                              
-                        <!-- Loading Spinner -->
                         <div id="loadingIndicator" class="text-center my-4" style="display: none;">
                             <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Generating...</span></div>
                             <p id="loadingMessage" class="mt-2 mb-0 text-light">Generating lyrics...</p>
                         </div>
-                        
-                        <!-- Audio Player Area -->
                         <div id="audioResultContainer" class="audio-container my-4" style="display: none;">
                             <h3 class="result-heading">Your New Track:</h3>
                             <audio id="audioPlayer" controls class="w-100 custom-audio-player"></audio>
@@ -176,33 +139,27 @@
                                 <pre id="lyricsOutput" class="p-3 border rounded bg-dark text-light mt-2"></pre>
                             </details>
                         </div>
-                        <!-- General Error Area -->
                         <div id="generalError" class="alert alert-danger mt-3" style="display: none;" role="alert"></div>
                     </form>
                 </section>
             </div>
-
-             <!-- Library Tab -->
             <div class="tab-pane fade" id="libraryTab">
                 <section class="library-section form-section">
                     <h2 class="text-center mb-4">My Generated Songs</h2>
                     <div id="libraryContent" class="list-group library-list">
-                        <!-- Library items loaded by JS -->
                         <p id="libraryLoading" class="text-center text-muted">Loading library...</p>
                         <p id="libraryEmpty" class="text-center text-muted" style="display: none;">Your library is empty. Generate some songs!</p>
                     </div>
                 </section>
             </div>
-        </div> <!-- End Tab Content -->
-    </div> <!-- End App Container -->
+        </div>
+    </div>
 
-
-    <!-- Login Modal -->
     <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-dark text-light">
           <div class="modal-header border-secondary">
-            <h5 class="modal-title" id="loginModalLabel">Login</h5>
+            <h5 class="modal-title" id="loginModalLabel">Login to Athletes Motivation</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -215,6 +172,9 @@
                 <label for="loginPassword" class="form-label">Password</label>
                 <input type="password" class="form-control custom-input" id="loginPassword" required>
               </div>
+              <div class="text-end mb-3">
+                <a href="request-reset.html" class="text-muted small">Forgot Password?</a>
+              </div>
               <div id="loginError" class="alert alert-danger" style="display: none;" role="alert"></div>
               <button type="submit" class="btn btn-primary w-100">Login</button>
             </form>
@@ -223,12 +183,11 @@
       </div>
     </div>
 
-    <!-- Signup Modal -->
-     <div class="modal fade" id="signupModal" tabindex="-1" aria-labelledby="signupModalLabel" aria-hidden="true">
+    <div class="modal fade" id="signupModal" tabindex="-1" aria-labelledby="signupModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-dark text-light">
           <div class="modal-header border-secondary">
-            <h5 class="modal-title" id="signupModalLabel">Sign Up</h5>
+            <h5 class="modal-title" id="signupModalLabel">Sign Up for Athletes Motivation</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -257,9 +216,7 @@
         </div>
       </div>
     </div>
-    <!-- End Modals -->
 
-    <!-- Audio Generation Advisory Modal -->
     <div class="modal fade" id="audioGenerationModal" tabindex="-1" aria-labelledby="audioGenerationModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark text-light">
@@ -280,13 +237,8 @@
         </div>
       </div>
     </div>
-    <!-- End Audio Generation Modal -->
-
-    <!-- Scripts -->
-    <script src="config.js"></script>
-    <!-- Bootstrap Bundle JS (Includes Popper) - MUST BE LOADED BEFORE main.js -->
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Your Custom JS -->
     <script src="main.js"></script>
 </body>
 </html>

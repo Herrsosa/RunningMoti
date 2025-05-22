@@ -2,14 +2,15 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto'); // For token generation
-// Import the new query function and hashing utils
-const { query, hashPassword, comparePassword } = require('../database');
-const { sendVerificationEmail } = require('../utils/emailSender'); // Import email sender
+const { query, hashPassword, comparePassword } = require('../database'); // Import db functions
+// Ensure sendPasswordResetEmail is correctly imported from emailSender
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailSender'); 
 const router = express.Router();
 
-const JWT_EXPIRY = '1h'; // Consider making this an environment variable
+const JWT_EXPIRY = process.env.JWT_EXPIRY || '1h'; // Use environment variable or default
+const RESET_TOKEN_EXPIRY_HOURS = 1; // Password reset token valid for 1 hour
 
-// Register User - REFACTORED for PostgreSQL
+// Register User
 router.post('/register', async (req, res) => {
     const { username, email, password } = req.body;
 
@@ -18,8 +19,6 @@ router.post('/register', async (req, res) => {
     }
 
     try {
-        // Use $1, $2 etc. for placeholders in pg
-        // Check if email exists and is verified
         const emailCheckResult = await query("SELECT id, is_verified FROM users WHERE email = $1", [email]);
         const existingVerifiedUser = emailCheckResult.rows.find(user => user.is_verified);
         const existingUnverifiedUser = emailCheckResult.rows.find(user => !user.is_verified);
@@ -28,7 +27,6 @@ router.post('/register', async (req, res) => {
             return res.status(409).json({ error: "Email is already registered and verified." });
         }
 
-        // Check if username exists (and doesn't belong to the potentially existing unverified user)
         const usernameCheckResult = await query("SELECT id FROM users WHERE username = $1", [username]);
         const existingUsername = usernameCheckResult.rows[0];
 
@@ -43,30 +41,27 @@ router.post('/register', async (req, res) => {
 
         let userId;
         if (existingUnverifiedUser) {
-            // Update existing unverified user record
             userId = existingUnverifiedUser.id;
             const updateSql = `
                 UPDATE users
-                SET password_hash = $1, verification_token = $2, verification_token_expires = $3
-                WHERE id = $4`;
-            await query(updateSql, [hashedPassword, verificationToken, expiresAt, userId]); // Use expiresAt directly (TIMESTAMPTZ)
+                SET password_hash = $1, verification_token = $2, verification_token_expires = $3, username = $4 
+                WHERE id = $5`; // Also update username in case it changed
+            await query(updateSql, [hashedPassword, verificationToken, expiresAt, username, userId]);
             console.log(`Updated existing unverified user ID: ${userId} for re-verification.`);
         } else {
-            // Insert new user
             const insertSql = `
-                INSERT INTO users (username, email, password_hash, verification_token, verification_token_expires, is_verified)
-                VALUES ($1, $2, $3, $4, $5, FALSE)
-                RETURNING id`; // Get the new ID back
+                INSERT INTO users (username, email, password_hash, verification_token, verification_token_expires, is_verified, credits)
+                VALUES ($1, $2, $3, $4, $5, FALSE, 2) 
+                RETURNING id`;
             const insertResult = await query(insertSql, [username, email, hashedPassword, verificationToken, expiresAt]);
             userId = insertResult.rows[0].id;
-            console.log(`Registered new user ID: ${userId}`);
+            console.log(`Registered new user ID: ${userId} with 2 credits.`);
         }
 
-        // Send verification email (keep this logic)
         const emailSent = await sendVerificationEmail(email, verificationToken);
 
         if (!emailSent) {
-            console.error(`Failed to send verification email to ${email} for user ID ${userId}. User needs to verify manually or request resend.`);
+            console.error(`Failed to send verification email to ${email} for user ID ${userId}.`);
             return res.status(201).json({
                  message: "Registration successful, but failed to send verification email. Please contact support or try verifying later.",
                  userId: userId
@@ -80,13 +75,12 @@ router.post('/register', async (req, res) => {
 
     } catch (error) {
         console.error("Registration Error:", error);
-        // Provide a more generic error in production
         res.status(500).json({ error: "Server error during registration. Please try again later." });
     }
 });
 
-// Login User - REFACTORED for PostgreSQL
-router.post('/login', async (req, res) => { // Make async
+// Login User
+router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -96,22 +90,20 @@ router.post('/login', async (req, res) => { // Make async
     try {
         const sql = `SELECT id, username, password_hash, credits, is_verified FROM users WHERE email = $1`;
         const result = await query(sql, [email]);
-        const user = result.rows[0]; // Get the first row if it exists
+        const user = result.rows[0];
 
         if (!user) {
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
+        if (!user.is_verified) {
+            console.log(`Login attempt failed for unverified user: ${email}`);
+            return res.status(403).json({ error: "Please verify your email address before logging in. Check your inbox (and spam folder)." });
+        }
+        
         const match = await comparePassword(password, user.password_hash);
 
         if (match) {
-            // Check verification status
-            if (!user.is_verified) {
-                console.log(`Login attempt failed for unverified user: ${email}`);
-                return res.status(403).json({ error: "Please verify your email address before logging in. Check your inbox (and spam folder)." });
-            }
-
-            // Issue token if password matches and user is verified
             const token = jwt.sign(
                 { id: user.id, username: user.username },
                 process.env.JWT_SECRET,
@@ -125,7 +117,6 @@ router.post('/login', async (req, res) => { // Make async
                 credits: user.credits
             });
         } else {
-            // Password doesn't match
             res.status(401).json({ error: "Invalid email or password." });
         }
 
@@ -135,8 +126,8 @@ router.post('/login', async (req, res) => { // Make async
     }
 });
 
-// Verify Email Endpoint - REFACTORED for PostgreSQL
-router.get('/verify-email', async (req, res) => { // Already async
+// Verify Email Endpoint
+router.get('/verify-email', async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
@@ -158,16 +149,12 @@ router.get('/verify-email', async (req, res) => { // Already async
             return res.redirect('/verification-result.html?status=success&message=Already_verified');
         }
 
-        // Check expiry (Postgres TIMESTAMPTZ is directly comparable)
         const now = new Date();
-        if (now > user.verification_token_expires) { // Direct comparison works
+        if (now > new Date(user.verification_token_expires)) { // Ensure comparison is with Date objects
             console.log(`Verification attempt failed: Token expired for user ID: ${user.id}`);
-            // Optional: Clean up expired token?
-            // await query("UPDATE users SET verification_token = NULL, verification_token_expires = NULL WHERE id = $1", [user.id]);
             return res.redirect('/verification-result.html?status=error&message=Expired_link');
         }
 
-        // Verify the user
         const updateSql = `
             UPDATE users
             SET is_verified = TRUE, verification_token = NULL, verification_token_expires = NULL
@@ -182,5 +169,107 @@ router.get('/verify-email', async (req, res) => { // Already async
         return res.redirect('/verification-result.html?status=error&message=Verification_failed');
     }
 });
+
+
+// ---- NEW: Request Password Reset Endpoint ----
+router.post('/request-password-reset', async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ error: "Email is required." });
+    }
+
+    try {
+        const userResult = await query("SELECT id, email, is_verified FROM users WHERE email = $1", [email]);
+        const user = userResult.rows[0];
+
+        if (!user) {
+            // Important: Don't reveal if an email address is registered or not for security reasons.
+            // Send a generic success message even if the user doesn't exist.
+            console.log(`Password reset requested for non-existent or unverified email: ${email}`);
+            return res.status(200).json({ message: "If your email address is in our system, you will receive a password reset link shortly." });
+        }
+
+        // Optionally, only allow password reset for verified users
+        if (!user.is_verified) {
+            console.log(`Password reset requested for unverified email: ${email}. Instructing to verify first.`);
+             return res.status(200).json({ message: "Your email address is not verified. Please verify your email before attempting a password reset. If you need a new verification link, please try signing up again or contact support." });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+
+        const updateSql = `
+            UPDATE users 
+            SET reset_password_token = $1, reset_password_expires = $2 
+            WHERE id = $3`;
+        await query(updateSql, [resetToken, expiresAt, user.id]);
+
+        const emailSent = await sendPasswordResetEmail(user.email, resetToken);
+
+        if (!emailSent) {
+            console.error(`Failed to send password reset email to ${user.email}.`);
+            // Still send a generic success to the user, but log the error for admin.
+            return res.status(200).json({ message: "If your email address is in our system, you will receive a password reset link shortly. There might be a delay." });
+        }
+
+        res.status(200).json({ message: "If your email address is in our system, you will receive a password reset link shortly." });
+
+    } catch (error) {
+        console.error("Request Password Reset Error:", error);
+        // Generic message to prevent leaking information
+        res.status(200).json({ message: "An error occurred. If the problem persists, please contact support." });
+    }
+});
+
+// ---- NEW: Reset Password Endpoint ----
+router.post('/reset-password', async (req, res) => {
+    const { token, password, confirmPassword } = req.body;
+
+    if (!token || !password || !confirmPassword) {
+        return res.status(400).json({ error: "Token, new password, and confirm password are required." });
+    }
+    if (password !== confirmPassword) {
+        return res.status(400).json({ error: "Passwords do not match." });
+    }
+    // Add password strength validation here if desired (e.g., minimum length)
+    if (password.length < 6) { // Example: Minimum 6 characters
+        return res.status(400).json({ error: "Password must be at least 6 characters long." });
+    }
+
+    try {
+        const userResult = await query(
+            "SELECT id, reset_password_expires FROM users WHERE reset_password_token = $1",
+            [token]
+        );
+        const user = userResult.rows[0];
+
+        if (!user) {
+            return res.status(400).json({ error: "Invalid or expired password reset token. Please request a new one." });
+        }
+
+        const now = new Date();
+        if (now > new Date(user.reset_password_expires)) {
+            // Clear the expired token
+            await query("UPDATE users SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = $1", [user.id]);
+            return res.status(400).json({ error: "Password reset token has expired. Please request a new one." });
+        }
+
+        const hashedPassword = await hashPassword(password);
+        const updateSql = `
+            UPDATE users 
+            SET password_hash = $1, reset_password_token = NULL, reset_password_expires = NULL 
+            WHERE id = $2`;
+        await query(updateSql, [hashedPassword, user.id]);
+
+        // Optionally, log the user in by issuing a new JWT token here, or just confirm success.
+        // For simplicity, we'll just confirm success.
+        res.status(200).json({ message: "Password has been reset successfully. You can now log in with your new password." });
+
+    } catch (error) {
+        console.error("Reset Password Error:", error);
+        res.status(500).json({ error: "Server error during password reset. Please try again later." });
+    }
+});
+
 
 module.exports = router;

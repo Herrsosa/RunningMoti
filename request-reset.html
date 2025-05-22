@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Password Reset - Athletes Motivation</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        /* Specific styles for this page */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+            padding-top: 0; /* Override padding from main style.css */
+        }
+        .reset-box {
+            background-color: var(--content-bg);
+            padding: 30px 40px;
+            border-radius: 15px;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            color: var(--text-light);
+        }
+        .reset-box .form-label {
+            text-align: left;
+            display: block; /* Ensure label takes full width */
+        }
+        .reset-box .form-control {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-bg);
+            color: var(--text-light);
+        }
+        .reset-box .form-control:focus {
+            background-color: var(--input-bg);
+            color: var(--text-light);
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        .message-area .alert {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-image"></div>
+    <div class="overlay"></div>
+
+    <div class="reset-box">
+        <h2>Reset Your Password</h2>
+        <p class="text-muted mb-4">Enter your email address and we'll send you a link to reset your password.</p>
+        
+        <form id="requestResetForm">
+            <div class="mb-3">
+                <label for="resetEmail" class="form-label">Email address</label>
+                <input type="email" class="form-control" id="resetEmail" required>
+            </div>
+            
+            <div id="messageArea" class="message-area my-3">
+                </div>
+            
+            <button type="submit" class="btn btn-primary w-100">Send Reset Link</button>
+        </form>
+        <hr class="my-4" style="border-color: var(--button-bg);">
+        <a href="/" class="text-muted small">Back to Login</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const requestResetForm = document.getElementById('requestResetForm');
+            const emailInput = document.getElementById('resetEmail');
+            const messageArea = document.getElementById('messageArea');
+            const submitButton = requestResetForm.querySelector('button[type="submit"]');
+
+            requestResetForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                messageArea.innerHTML = ''; // Clear previous messages
+                submitButton.disabled = true;
+                submitButton.textContent = 'Sending...';
+
+                const email = emailInput.value.trim();
+
+                if (!email) {
+                    displayMessage('Please enter your email address.', 'danger');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Send Reset Link';
+                    return;
+                }
+
+                try {
+                    // Note: In main.js, BASE_API_URL is '/api'. We'll use that convention.
+                    const response = await fetch('/api/auth/request-password-reset', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email: email }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        // Display the success message from the API (e.g., "If your email...")
+                        displayMessage(data.message || 'If your email address is in our system, you will receive a password reset link shortly.', 'success');
+                        emailInput.value = ''; // Clear the input field on success
+                    } else {
+                        // Display the error message from the API or a generic one
+                        displayMessage(data.error || 'An error occurred. Please try again.', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Request password reset error:', error);
+                    displayMessage('A network error occurred. Please try again.', 'danger');
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Send Reset Link';
+                }
+            });
+
+            function displayMessage(message, type = 'info') { // type can be 'success', 'danger', 'info', 'warning'
+                messageArea.innerHTML = `<div class="alert alert-${type}" role="alert">${message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
