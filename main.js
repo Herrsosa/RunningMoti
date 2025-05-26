@@ -711,21 +711,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     var audioModal = new bootstrap.Modal(document.getElementById('audioGenerationModal'));
                     audioModal.show();
                     loadLibrary();
-                    // Automatically hide the advisory modal after 3 seconds to ensure library elements are interactive
-                    setTimeout(() => {
-                        audioModal.hide();
-                        // Ensure modal backdrop is removed and body class reset to allow interaction
-                        document.body.classList.remove('modal-open');
-                        document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
-                        // Re-enable pointer events on the library content in case they were blocked
-                        if (libraryContent) {
-                            libraryContent.style.pointerEvents = 'auto';
-                        }
-                        console.log('Audio generation modal timeout finished');
-                    }, 3000);
                 }
 
-                // We're done here—return early so we don't hit any further code
                 return;
 
             } catch (err) {
