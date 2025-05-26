@@ -554,6 +554,17 @@ document.addEventListener('DOMContentLoaded', function () {
         songForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
+            // Clear any error messages at start
+            if (document.getElementById('generalError')) {
+                document.getElementById('generalError').style.display = 'none';
+            }
+            if (document.getElementById('workout-error')) {
+                document.getElementById('workout-error').style.display = 'none';
+            }
+            if (document.getElementById('tone-error')) {
+                document.getElementById('tone-error').style.display = 'none';
+            }
+
             // Ensure all required elements exist before proceeding
             if (!workoutInput || !musicStyleInput || !motivateButton || !loadingIndicator || !loadingMessage ||
                 !generalErrorDiv || !workoutErrorDiv || !toneErrorDiv || !audioResultContainer || !lyricsOutput || !audioPlayer ) {
