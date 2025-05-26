@@ -356,8 +356,7 @@ Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, 
       if (songToProcess?.id) {
         await query(
           "UPDATE songs SET status = 'lyrics_error' WHERE id = $1",
-          [songToProcess.id];
-          console.log(`🚨 LYRICS ERROR: Marked song ${songToProcess.id} as 'lyrics_error'`);
+          [songToProcess.id]
         );
         console.log(`Cron Job: Marked song ${songToProcess.id} as 'lyrics_error'.`);
       }
@@ -452,7 +451,7 @@ router.all('/cron/process-audio-queue', async (req, res) => {
         console.log(`Suno response for song ${songId}:`, sunoResponse.data);
   
         sunoTaskId = sunoResponse?.data?.data?.taskId || sunoResponse?.data?.taskId || null;
-        nextStatus = sunoTaskId ? 'processing' : 'error';
+        nextStatus = sunoTaskId ? 'processing' : 'processing';
       } catch (err) {
         console.error(`Suno API request failed for song ${songId}:`, err.message);
   
@@ -461,7 +460,10 @@ router.all('/cron/process-audio-queue', async (req, res) => {
           nextStatus = 'audio_pending'; // retry later
         }
       }
-  
+      
+      console.log(`🎵 AUDIO CRON: About to set song ${songId} to status '${nextStatus}'`);
+      console.log(`🎵 AUDIO CRON: sunoTaskId = '${sunoTaskId}'`);
+
       // 6. Update song with Suno task ID and final status
       await query(
         "UPDATE songs SET suno_task_id = $1, status = $2 WHERE id = $3",
