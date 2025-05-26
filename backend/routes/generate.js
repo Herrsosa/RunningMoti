@@ -356,7 +356,8 @@ Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, 
       if (songToProcess?.id) {
         await query(
           "UPDATE songs SET status = 'lyrics_error' WHERE id = $1",
-          [songToProcess.id]
+          [songToProcess.id];
+          console.log(`🚨 LYRICS ERROR: Marked song ${songToProcess.id} as 'lyrics_error'`);
         );
         console.log(`Cron Job: Marked song ${songToProcess.id} as 'lyrics_error'.`);
       }
