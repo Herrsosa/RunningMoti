@@ -443,7 +443,7 @@ router.all('/cron/process-audio-queue', async (req, res) => {
   
       let sunoResponse;
       let sunoTaskId = null;
-      let nextStatus = 'error';
+      let nextStatus = 'processing';
   
       try {
         console.log(`Submitting to Suno for song ${songId}...`);
