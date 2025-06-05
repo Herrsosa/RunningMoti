@@ -1,15 +1,17 @@
 // backend/routes/generate.js
 const express = require('express');
 const axios = require('axios');
-// Import the new query function
 const { query } = require('../database');
-const verifyToken = require('../middleware/authMiddleware'); // Import authentication middleware
+const verifyToken = require('../middleware/authMiddleware');
+const { logger } = require('../utils/logger');
+const { validateSchema, schemas } = require('../middleware/validation');
+const { generationLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 
 const CREDITS_PER_SONG = 1; // Define how many credits a song costs
 
 // Generate lyrics endpoint (Protected) - REFACTORED for Async Lyrics via Cron
-router.post('/generate-lyrics', verifyToken, async (req, res) => {
+router.post('/generate-lyrics', verifyToken, generationLimiter, validateSchema(schemas.songGeneration), async (req, res) => {
     const userId = req.userId; // Get user ID from verified token
 
     // --- Check Credits ---
