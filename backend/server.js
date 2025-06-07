@@ -1,13 +1,20 @@
-// as early as possible, before any other requires:
-require("dotenv").config();
-console.log("▶ MAILERSEND_API_KEY is set?", !!process.env.MAILERSEND_API_KEY);
+// Load environment variables as early as possible
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+// Validate environment before proceeding
+const { validateEnv, logEnvironmentStatus } = require('./utils/envValidator');
+const config = validateEnv();
 
 // backend/server.js
-console.log("--- Loading backend/server.js ---"); // Add top-level log
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') }); // Explicitly set path
+const helmet = require('helmet');
+
+// Import utilities
+const { logger, httpLogger } = require('./utils/logger');
+const { sanitizeInput } = require('./middleware/validation');
+const { apiLimiter } = require('./middleware/rateLimiter');
 
 // --- Import Database Initialization ---
 const { initializeDatabase } = require('./database'); // Import the init function
@@ -19,12 +26,47 @@ const libraryRoutes = require('./routes/library');
 const stripeRoutes = require('./routes/stripe');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = config.PORT || 5000;
 
-// --- Middleware ---
-app.use(cors()); // Consider more restrictive CORS settings for production
-app.use(express.json()); // For parsing application/json
-app.use(express.urlencoded({ extended: true })); // If using callbacks via form post
+// --- Security Middleware ---
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://cdn.jsdelivr.net", "https://cdn.vercel-insights.com"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "https://api.stripe.com", "https://vitals.vercel-insights.com"],
+            mediaSrc: ["'self'", "https:"],
+            fontSrc: ["'self'", "https://cdn.jsdelivr.net"]
+        }
+    }
+}));
+
+// CORS configuration
+const corsOptions = {
+    origin: config.NODE_ENV === 'production' 
+        ? ['https://running-moti.vercel.app', 'https://your-domain.com'] 
+        : ['http://localhost:3000', 'http://localhost:5000', 'http://127.0.0.1:5000'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+// Rate limiting
+if (config.ENABLE_RATE_LIMITING) {
+    app.use('/api/', apiLimiter);
+}
+
+// Request logging
+app.use(httpLogger);
+
+// Request parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Input sanitization
+app.use(sanitizeInput);
 
 // --- Serve Static Files for Local Development ---
 // This will serve files from the 'public' directory at the root level
@@ -38,18 +80,60 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 // --- API Routes ---
 // Vercel handles serving static files (index.html, etc.) from the root.
 // Express only needs to handle the API endpoints.
-app.use('/api/auth', (req, res, next) => { // Add logging middleware
-    console.log(`--- Request received for /api/auth${req.path} ---`);
-    next(); // Pass control to authRoutes
+app.use('/api/auth', (req, res, next) => {
+    logger.debug(`Auth request received: ${req.method} ${req.path}`, {
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+    });
+    next();
 }, authRoutes);
-app.use('/api/generate', generateRoutes); // Prefix generate routes
-app.use('/api/library', libraryRoutes);  // Prefix library routes
-app.use('/api/stripe', stripeRoutes);    // Add Stripe routes
+app.use('/api/generate', generateRoutes);
+app.use('/api/library', libraryRoutes);
+app.use('/api/stripe', stripeRoutes);
 
-// --- Simple Health Check ---
+// --- Health Check Endpoint ---
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    const healthCheck = {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: config.NODE_ENV,
+        version: require('./package.json').version || '1.0.0',
+        memory: process.memoryUsage(),
+        database: 'connected' // You could add actual DB health check here
+    };
+    
+    res.json(healthCheck);
 });
+
+// --- API Documentation endpoint (development only) ---
+if (config.NODE_ENV === 'development') {
+    app.get('/api/docs', (req, res) => {
+        res.json({
+            endpoints: {
+                health: 'GET /api/health',
+                auth: {
+                    register: 'POST /api/auth/register',
+                    login: 'POST /api/auth/login',
+                    verify: 'GET /api/auth/verify-email',
+                    resetRequest: 'POST /api/auth/request-password-reset',
+                    resetPassword: 'POST /api/auth/reset-password'
+                },
+                generate: {
+                    lyrics: 'POST /api/generate/generate-lyrics',
+                    audio: 'POST /api/generate/generate-audio',
+                    lyricsStatus: 'GET /api/generate/lyrics-status/:songId',
+                    audioStatus: 'GET /api/generate/audio-status/:songId'
+                },
+                library: {
+                    songs: 'GET /api/library/songs',
+                    profile: 'GET /api/library/profile',
+                    deleteSong: 'DELETE /api/library/songs/:songId'
+                }
+            }
+        });
+    });
+}
 
 
 // --- Catch-all for 404 API routes ---
@@ -57,37 +141,97 @@ app.use('/api/*', (req, res) => {
     res.status(404).json({ error: 'API endpoint not found' });
 });
 
-// --- Basic Error Handling Middleware ---
+// --- Error Handling Middleware ---
 app.use((err, req, res, next) => {
-  console.error("Unhandled Error:", err.stack || err);
-  // Avoid sending stack trace to client in production
-  res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// --- Start Server Function ---
-// Wrap in an async function to allow awaiting DB initialization
-const startServer = async () => {
-  try {
-    // Ensure database schema is initialized before starting the server
-    await initializeDatabase();
-    console.log("Database initialization check complete. Starting server...");
-
-    app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-      // Check for essential env vars after successful start
-      if (!process.env.JWT_SECRET || !process.env.OPENAI_API_KEY || !process.env.SUNO_API_KEY) {
-          console.warn("⚠️ WARNING: Ensure JWT_SECRET, OPENAI_API_KEY, SUNO_API_KEY (and others) are set in your .env file!");
-      }
-       if (!process.env.POSTGRES_URL) {
-           console.error("❌ FATAL: POSTGRES_URL environment variable is missing!");
-       }
+    logger.error('Unhandled Error', {
+        error: err.message,
+        stack: err.stack,
+        url: req.url,
+        method: req.method,
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
     });
 
-  } catch (error) {
-    console.error("❌ FATAL: Failed to initialize database or start server:", error);
-    process.exit(1); // Exit if critical initialization fails
-  }
+    // Don't send stack trace to client in production
+    const isDev = config.NODE_ENV === 'development';
+    res.status(err.status || 500).json({
+        error: isDev ? err.message : 'Internal server error',
+        ...(isDev && { stack: err.stack })
+    });
+});
+
+// --- Graceful Shutdown ---
+const gracefulShutdown = (signal) => {
+    logger.info(`Received ${signal}. Starting graceful shutdown...`);
+    
+    // Close server
+    server.close(() => {
+        logger.info('HTTP server closed');
+        
+        // Close database connections, etc.
+        process.exit(0);
+    });
+    
+    // Force close after 30 seconds
+    setTimeout(() => {
+        logger.error('Forced shutdown after timeout');
+        process.exit(1);
+    }, 30000);
 };
 
-// --- Run the Server ---
-startServer();
+// --- Start Server Function ---
+const startServer = async () => {
+    try {
+        // Log environment status
+        logEnvironmentStatus();
+        
+        // Ensure database schema is initialized before starting the server
+        await initializeDatabase();
+        logger.info("Database initialization completed successfully");
+
+        const server = app.listen(PORT, () => {
+            logger.info(`Server started successfully`, {
+                port: PORT,
+                environment: config.NODE_ENV,
+                pid: process.pid
+            });
+            
+            if (config.NODE_ENV === 'development') {
+                logger.info(`API Documentation available at: http://localhost:${PORT}/api/docs`);
+                logger.info(`Health check available at: http://localhost:${PORT}/api/health`);
+            }
+        });
+
+        // Graceful shutdown handlers
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+        return server;
+
+    } catch (error) {
+        logger.error("Failed to start server", {
+            error: error.message,
+            stack: error.stack
+        });
+        process.exit(1);
+    }
+};
+
+// --- Handle Uncaught Exceptions ---
+process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection', { reason, promise });
+    process.exit(1);
+});
+
+// --- Export for testing ---
+module.exports = app;
+
+// --- Start the server if this file is run directly ---
+if (require.main === module) {
+    startServer();
+}
