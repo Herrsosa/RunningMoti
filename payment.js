@@ -1,6 +1,9 @@
 // Initialize Stripe
 const stripe = Stripe('your_stripe_publishable_key_here'); // Replace with your publishable key
 
+// Stripe.js Elements instance (used in handleSubmit)
+let elements;
+
 // Create payment form
 function createPaymentForm(containerId, amount) {
     const container = document.getElementById(containerId);
@@ -39,7 +42,7 @@ async function initializePaymentElement(amount) {
         
         const { clientSecret } = await response.json();
         
-        const elements = stripe.elements({
+        elements = stripe.elements({
             clientSecret,
             appearance: {
                 theme: 'stripe',
@@ -83,4 +86,4 @@ async function handleSubmit(e) {
 }
 
 // Export functions for use in other files
-window.createPaymentForm = createPaymentForm; 
+window.createPaymentForm = createPaymentForm;
