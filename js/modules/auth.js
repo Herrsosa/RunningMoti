@@ -13,14 +13,23 @@ export class AuthManager {
         
         this.loginModal = null;
         this.signupModal = null;
+        this.modalsInitialized = false;
         
         this.init();
     }
 
     init() {
-        this.setupModals();
-        this.setupEventListeners();
-        this.updateUIBasedOnLoginState();
+        // Wait for Bootstrap to be available before initializing modals
+        this.waitForBootstrap().then(() => {
+            this.setupModals();
+            this.setupEventListeners();
+            this.updateUIBasedOnLoginState();
+        }).catch(error => {
+            console.error('Failed to initialize Bootstrap modals:', error);
+            // Fallback: setup event listeners without modals
+            this.setupEventListenersWithoutModals();
+            this.updateUIBasedOnLoginState();
+        });
         
         // Listen for auth logout events
         window.addEventListener('auth:logout', () => {
@@ -28,16 +37,55 @@ export class AuthManager {
         });
     }
 
+    async waitForBootstrap(maxAttempts = 50, interval = 100) {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            
+            const checkBootstrap = () => {
+                attempts++;
+                
+                if (window.bootstrap && window.bootstrap.Modal) {
+                    console.log('✅ Bootstrap is available');
+                    resolve();
+                    return;
+                }
+                
+                if (attempts >= maxAttempts) {
+                    console.warn('⚠️ Bootstrap not available after waiting');
+                    reject(new Error('Bootstrap not available'));
+                    return;
+                }
+                
+                setTimeout(checkBootstrap, interval);
+            };
+            
+            checkBootstrap();
+        });
+    }
+
     setupModals() {
-        const loginModalEl = document.getElementById('loginModal');
-        const signupModalEl = document.getElementById('signupModal');
-        
-        if (loginModalEl && window.bootstrap) {
-            this.loginModal = new bootstrap.Modal(loginModalEl);
-        }
-        
-        if (signupModalEl && window.bootstrap) {
-            this.signupModal = new bootstrap.Modal(signupModalEl);
+        try {
+            const loginModalEl = document.getElementById('loginModal');
+            const signupModalEl = document.getElementById('signupModal');
+            
+            if (loginModalEl && window.bootstrap) {
+                this.loginModal = new window.bootstrap.Modal(loginModalEl);
+                console.log('✅ Login modal initialized');
+            } else {
+                console.error('❌ Could not initialize login modal');
+            }
+            
+            if (signupModalEl && window.bootstrap) {
+                this.signupModal = new window.bootstrap.Modal(signupModalEl);
+                console.log('✅ Signup modal initialized');
+            } else {
+                console.error('❌ Could not initialize signup modal');
+            }
+            
+            this.modalsInitialized = true;
+        } catch (error) {
+            console.error('Error setting up modals:', error);
+            this.modalsInitialized = false;
         }
     }
 
@@ -47,12 +95,72 @@ export class AuthManager {
         const showSignupBtn = document.getElementById('showSignupBtn');
         const logoutButton = document.getElementById('logoutButton');
         
-        if (showLoginBtn && this.loginModal) {
-            showLoginBtn.addEventListener('click', () => this.loginModal.show());
+        if (showLoginBtn) {
+            showLoginBtn.addEventListener('click', () => {
+                console.log('Login button clicked');
+                if (this.loginModal) {
+                    this.loginModal.show();
+                } else {
+                    console.error('Login modal not available, trying fallback');
+                    this.showLoginFallback();
+                }
+            });
+            console.log('✅ Login button event listener attached');
+        } else {
+            console.error('❌ Login button not found');
         }
         
-        if (showSignupBtn && this.signupModal) {
-            showSignupBtn.addEventListener('click', () => this.signupModal.show());
+        if (showSignupBtn) {
+            showSignupBtn.addEventListener('click', () => {
+                console.log('Signup button clicked');
+                if (this.signupModal) {
+                    this.signupModal.show();
+                } else {
+                    console.error('Signup modal not available, trying fallback');
+                    this.showSignupFallback();
+                }
+            });
+            console.log('✅ Signup button event listener attached');
+        } else {
+            console.error('❌ Signup button not found');
+        }
+        
+        if (logoutButton) {
+            logoutButton.addEventListener('click', () => this.handleLogout());
+            console.log('✅ Logout button event listener attached');
+        }
+
+        // Form submissions
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+            console.log('✅ Login form event listener attached');
+        }
+        
+        if (signupForm) {
+            signupForm.addEventListener('submit', (e) => this.handleSignup(e));
+            console.log('✅ Signup form event listener attached');
+        }
+    }
+
+    setupEventListenersWithoutModals() {
+        // Fallback setup without modals
+        const showLoginBtn = document.getElementById('showLoginBtn');
+        const showSignupBtn = document.getElementById('showSignupBtn');
+        const logoutButton = document.getElementById('logoutButton');
+        
+        if (showLoginBtn) {
+            showLoginBtn.addEventListener('click', () => {
+                this.showLoginFallback();
+            });
+        }
+        
+        if (showSignupBtn) {
+            showSignupBtn.addEventListener('click', () => {
+                this.showSignupFallback();
+            });
         }
         
         if (logoutButton) {
@@ -70,6 +178,88 @@ export class AuthManager {
         if (signupForm) {
             signupForm.addEventListener('submit', (e) => this.handleSignup(e));
         }
+    }
+
+    showLoginFallback() {
+        // Fallback method to show login modal using vanilla JS
+        const loginModalEl = document.getElementById('loginModal');
+        if (loginModalEl) {
+            loginModalEl.style.display = 'block';
+            loginModalEl.classList.add('show');
+            document.body.classList.add('modal-open');
+            
+            // Add backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.id = 'login-backdrop';
+            document.body.appendChild(backdrop);
+            
+            // Close on backdrop click
+            backdrop.addEventListener('click', () => this.hideLoginFallback());
+            
+            // Close on X button click
+            const closeBtn = loginModalEl.querySelector('.btn-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => this.hideLoginFallback());
+            }
+        }
+    }
+
+    hideLoginFallback() {
+        const loginModalEl = document.getElementById('loginModal');
+        const backdrop = document.getElementById('login-backdrop');
+        
+        if (loginModalEl) {
+            loginModalEl.style.display = 'none';
+            loginModalEl.classList.remove('show');
+        }
+        
+        if (backdrop) {
+            backdrop.remove();
+        }
+        
+        document.body.classList.remove('modal-open');
+    }
+
+    showSignupFallback() {
+        // Similar fallback for signup modal
+        const signupModalEl = document.getElementById('signupModal');
+        if (signupModalEl) {
+            signupModalEl.style.display = 'block';
+            signupModalEl.classList.add('show');
+            document.body.classList.add('modal-open');
+            
+            // Add backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.id = 'signup-backdrop';
+            document.body.appendChild(backdrop);
+            
+            // Close on backdrop click
+            backdrop.addEventListener('click', () => this.hideSignupFallback());
+            
+            // Close on X button click
+            const closeBtn = signupModalEl.querySelector('.btn-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => this.hideSignupFallback());
+            }
+        }
+    }
+
+    hideSignupFallback() {
+        const signupModalEl = document.getElementById('signupModal');
+        const backdrop = document.getElementById('signup-backdrop');
+        
+        if (signupModalEl) {
+            signupModalEl.style.display = 'none';
+            signupModalEl.classList.remove('show');
+        }
+        
+        if (backdrop) {
+            backdrop.remove();
+        }
+        
+        document.body.classList.remove('modal-open');
     }
 
     async handleLogin(e) {
@@ -116,8 +306,11 @@ export class AuthManager {
             
             this.updateUIBasedOnLoginState();
             
+            // Hide modal using appropriate method
             if (this.loginModal) {
                 this.loginModal.hide();
+            } else {
+                this.hideLoginFallback();
             }
             
             // Dispatch login event
@@ -176,8 +369,11 @@ export class AuthManager {
                 passwordInput.value
             );
             
+            // Hide modal using appropriate method
             if (this.signupModal) {
                 this.signupModal.hide();
+            } else {
+                this.hideSignupFallback();
             }
             
             // Show success message
