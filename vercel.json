@@ -6,16 +6,27 @@
       "use": "@vercel/node",
       "config": { "maxDuration": 60 }
     },
-    { "src": "*.{html,css,js,png,mp3}", "use": "@vercel/static" },
-    { "src": "public/audio/*.mp3", "use": "@vercel/static" }
+    { 
+      "src": "*.{html,css,js,png,mp3}", 
+      "use": "@vercel/static" 
+    },
+    { 
+      "src": "js/**/*.js", 
+      "use": "@vercel/static" 
+    },
+    { 
+      "src": "public/audio/*.mp3", 
+      "use": "@vercel/static" 
+    }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/server.js" },
     { "src": "/audio/(.*)", "dest": "public/audio/$1" },
-    { "src": "/(.*)",     "dest": "/$1" }
+    { "src": "/js/(.*)", "dest": "/js/$1" },
+    { "src": "/(.*)", "dest": "/$1" }
   ],
   "crons": [
     { "path": "/api/generate/cron/process-lyrics-queue", "schedule": "* * * * *" },
-    { "path": "/api/generate/cron/process-audio-queue",  "schedule": "* * * * *" }
+    { "path": "/api/generate/cron/process-audio-queue", "schedule": "* * * * *" }
   ]
 }
