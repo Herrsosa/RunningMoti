@@ -122,8 +122,8 @@ router.post('/suno-callback', async (req, res) => {
     }
 
     let audioUrl = null;
-    let status = 'error';
-    let errorMsg = 'Unknown callback status or format.';
+    let status;
+    let errorMsg = null;
 
     if (req.body?.code === 200 && req.body?.data?.callbackType === "complete" && Array.isArray(req.body.data.data) && req.body.data.data.length > 0) {
         // Get the audio URL from the callback
@@ -145,7 +145,9 @@ router.post('/suno-callback', async (req, res) => {
         errorMsg = req.body.data.msg || 'Suno generation failed (no specific message).';
         console.error(`Callback FAILURE reported for Song ${songId}:`, errorMsg);
     } else {
-        console.warn(`Callback received unknown status/format for Song ${songId}.`);
+        // Treat other callback types (e.g., progress updates) as processing
+        status = 'processing';
+        console.log(`Callback progress for Song ${songId}:`, req.body?.data?.callbackType);
     }
 
     try {
