@@ -41,8 +41,11 @@ const transports = [
     })
 ];
 
-// Add file transport in production
-if (process.env.NODE_ENV === 'production') {
+// Only add file transports if not running on Vercel (or if logs directory is writable)
+if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.VERCEL !== '1' // Vercel sets this env variable
+) {
     transports.push(
         new winston.transports.File({
             filename: path.join(__dirname, '../logs/error.log'),
