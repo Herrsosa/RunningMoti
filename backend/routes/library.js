@@ -29,7 +29,7 @@ router.get('/profile', verifyToken, async (req, res) => { // Make async
 router.get('/songs', verifyToken, async (req, res) => { // Make async
     const userId = req.userId;
     const sql = `
-        SELECT id, title, workout_input, style_input, audio_url, status, created_at
+        SELECT id, title, track_name, workout_input, style_input, audio_url, status, created_at
         FROM songs
         WHERE user_id = $1
         ORDER BY created_at DESC`; // Use $1

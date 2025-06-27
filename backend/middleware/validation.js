@@ -31,7 +31,8 @@ const schemas = {
         customStyle: Joi.string().max(200).allow('').trim(),
         tone: Joi.string().max(100).allow('').trim(),
         language: Joi.string().max(100).allow('').trim(),
-        name: Joi.string().max(100).allow('').trim()
+        name: Joi.string().max(100).allow('').trim(),
+        trackName: Joi.string().max(100).allow('').trim()
     }).custom((value, helpers) => {
         // At least one of musicStyle or customStyle must be provided
         if (!value.musicStyle && !value.customStyle) {

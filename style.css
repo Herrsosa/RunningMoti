@@ -574,4 +574,14 @@
   /* For brevity, I'm omitting the full payment styles if they were extensive and unchanged. */
   /* If they were part of the original style.css, they should remain. */
   
+  input.is-valid, select.is-valid, textarea.is-valid {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 0.15rem rgba(40,167,69,.15);
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%2328a745" height="20" viewBox="0 0 20 20" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M7.629 15.29a1 1 0 0 1-1.415 0l-4.243-4.242a1 1 0 1 1 1.415-1.415l3.536 3.535 7.778-7.778a1 1 0 1 1 1.415 1.415l-8.486 8.485z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.2em 1.2em;
+    padding-right: 2.5em;
+  }
+  
   

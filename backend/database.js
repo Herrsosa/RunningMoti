@@ -83,7 +83,7 @@ const initializeDatabase = async () => {
         await addColumnIfNotExistsPg(client, 'songs', 'custom_style', 'TEXT');
         await addColumnIfNotExistsPg(client, 'songs', 'tone_input', 'TEXT');
         await addColumnIfNotExistsPg(client, 'songs', 'language_input', 'TEXT');
-
+        await addColumnIfNotExistsPg(client, 'songs', 'track_name', 'TEXT');
 
         // Update default credits for existing users if they are at 5 (old default)
         // This is a one-time-ish migration logic.

@@ -78,9 +78,13 @@
                             <input type="text" class="form-control custom-input" id="nameInput" name="name" placeholder="Name for the song (e.g., Alex)"/>
                         </div>
                         <div class="step mb-3">
-                            <div class="step-label-container"><span class="step-number">2</span><label for="workoutInput" class="step-title">Workout Target</label></div>
+                            <div class="step-label-container"><span class="step-number">1a</span><label for="trackNameInput" class="step-title">Track Name (Optional)</label></div>
+                            <input type="text" class="form-control custom-input" id="trackNameInput" name="trackName" placeholder="e.g., Morning Run Anthem"/>
+                        </div>
+                        <div class="step mb-3">
+                            <div class="step-label-container"><span class="step-number">2</span><label for="workoutInput" class="step-title">Activity / Goal</label></div>
                             <input type="text" class="form-control custom-input" id="workoutInput" name="workout" placeholder="e.g., 10k run, Bench press PR" required />
-                            <div class="invalid-feedback" id="workout-error">Please enter your workout target.</div>
+                            <div class="invalid-feedback" id="workout-error">Please enter your activity or goal.</div>
                         </div>
                         <div class="step mb-4">
                             <div class="step-label-container"><span class="step-number">3</span><label class="step-title">Music Style / Tone</label></div>
@@ -99,13 +103,16 @@
                           <input type="text" id="customStyleInput" name="customStyle" class="form-control" placeholder="e.g. Jazz Fusion, Chiptune">
                         </div>
                         <div class="mt-3">
-                          <label for="toneInput" class="form-label">Select Tone:</label>
+                          <label for="toneInput" class="form-label">Energy / Mood</label>
                           <select id="toneInput" class="form-select">
                             <option value="">(default: Inspiring)</option>
-                            <option>Melancholic</option>
-                            <option>Triumphant</option>
-                            <option>Peaceful</option>
-                            <option>Aggressive</option>
+                            <option>🏔 Epic</option>
+                            <option>🔥 Aggressive</option>
+                            <option>😎 Chill</option>
+                            <option>✨ Uplifting</option>
+                            <option>😢 Melancholic</option>
+                            <option>🏆 Triumphant</option>
+                            <option>🧘 Peaceful</option>
                           </select>
                         </div>
                         <div class="mt-3">
@@ -123,7 +130,7 @@
                          <div class="text-center text-muted mb-3" id="creditCostInfo" style="font-size: 0.9em;">
                              Generating a song costs 1 credit.
                          </div>
-                        <button type="submit" id="motivateButton" class="btn motivate-button w-100 mt-2">MOTIVATE (1 Credit)</button>
+                        <button type="submit" id="motivateButton" class="btn motivate-button w-100 mt-2">Generate My Track (1 credit)</button>
                         <div id="progressContainer" style="display:none; margin:1rem 0;">
                         <progress id="generationProgress" max="100" value="0" style="width:100%;"></progress>
                         </div>

@@ -56,10 +56,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const generalErrorDiv = document.getElementById('generalError');
     const workoutErrorDiv = document.getElementById('workout-error');
     const toneErrorDiv = document.getElementById('tone-error');
-    const customStyleInput    = document.getElementById('customStyleInput');
-    const toneInput           = document.getElementById('toneInput');
-    const languageInput       = document.getElementById('languageInput');
+    const customStyleInput = document.getElementById('customStyleInput');
+    const toneInput = document.getElementById('toneInput');
+    const languageInput = document.getElementById('languageInput');
     const customLanguageInput = document.getElementById('customLanguageInput');
+    const trackNameInput = document.getElementById('trackNameInput');
 
     // ─── New: Show/Hide Custom Language Field ────────
     languageInput.addEventListener('change', () => {
@@ -442,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function () {
          const itemInfoDiv = document.createElement('div');
          itemInfoDiv.className = 'library-item-info';
          itemInfoDiv.innerHTML = `
-             <h5>${song.title || 'Untitled Song'}</h5>
+             <h5>${song.title || song.trackName || 'Untitled Song'}</h5>
              <p>Workout: ${song.workout_input || 'N/A'}<br>Style: ${song.style_input || 'N/A'} | Date: ${formattedDate}</p>
          `;
 
@@ -634,6 +635,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 : (customLanguageInput.value.trim() || 'English');
             
             const name = nameInput ? nameInput.value.trim() : ''; // Handle optional name input
+            const trackName = trackNameInput ? trackNameInput.value.trim() : '';
 
             let lyricsPollInterval; // Interval for lyrics status
             let audioPollInterval; // Interval for audio status
@@ -648,7 +650,7 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 // --- Step 1: Initiate Lyric Generation (Backend creates pending record) ---
                 loadingMessage.textContent = "Initiating lyric generation...";
-                const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle,customStyle, tone, language, name });
+                const initiateLyricsResponse = await apiRequest('/generate/generate-lyrics', 'POST', { workout, musicStyle,customStyle, tone, language, name, trackName });
                 songId = initiateLyricsResponse.songId; // Get the song ID
                 console.log(`Lyric generation initiated for song ID: ${songId}. Starting status poll.`);
 
@@ -807,5 +809,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Initial Load ---
     updateUIBasedOnLoginState();
+
+    function setValidState(input) {
+        if (input.value.trim()) {
+            input.classList.add('is-valid');
+        } else {
+            input.classList.remove('is-valid');
+        }
+    }
+
+    [nameInput, workoutInput, customStyleInput, trackNameInput].forEach(function(input) {
+        if (input) {
+            input.addEventListener('input', function() {
+                setValidState(input);
+            });
+            // Initial state
+            setValidState(input);
+        }
+    });
 
 }); // End DOMContentLoaded Wrapper
