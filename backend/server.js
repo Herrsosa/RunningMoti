@@ -1,3 +1,4 @@
+const path = require('path');
 // Load environment variables as early as possible
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
@@ -8,7 +9,6 @@ const config = validateEnv();
 // backend/server.js
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const helmet = require('helmet');
 
 // Import utilities
