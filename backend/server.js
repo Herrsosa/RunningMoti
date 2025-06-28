@@ -28,6 +28,9 @@ const stripeRoutes = require('./routes/stripe');
 const app = express();
 const PORT = config.PORT || 5000;
 
+// Trust proxy for rate limiting behind load balancers (Vercel, etc.)
+app.set('trust proxy', 1);
+
 // --- Security Middleware ---
 app.use(helmet({
     contentSecurityPolicy: {
