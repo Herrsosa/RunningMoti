@@ -348,6 +348,12 @@ Avoid cliché lines or generic rhymes. Make the lyrics feel personal, visceral, 
         [lyrics, finalStatus, songId]
       );
       console.log(`Cron Job: Updated song ${songId} with status '${finalStatus}'.`);
+
+      // If lyrics were successfully generated, set status to 'audio_pending' to trigger audio generation
+      if (finalStatus === "lyrics_complete") {
+        await query("UPDATE songs SET status = 'audio_pending' WHERE id = $1", [songId]);
+        console.log(`Song ${songId} set to 'audio_pending' for audio generation.`);
+      }
   
       // 5) Send a response so Vercel doesn't timeout
       return res
