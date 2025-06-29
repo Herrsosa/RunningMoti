@@ -123,20 +123,26 @@ export class SongGenerator {
         const formData = this.getFormData();
         
         try {
+            console.log('Starting generation process...');
             this.setGenerationState('preparing');
             
             // Step 1: Generate lyrics
+            console.log('Calling generateLyrics API...');
             const lyricsResponse = await api.generateLyrics(formData);
             this.currentGenerationId = lyricsResponse.songId;
+            console.log('Lyrics generation initiated, songId:', this.currentGenerationId);
             
+            // Ensure we transition to lyrics state
             this.setGenerationState('lyrics');
             
             // Step 2: Poll for lyrics completion
+            console.log('Starting lyrics polling...');
             const lyrics = await this.pollLyricsStatus(this.currentGenerationId);
             
             this.displayLyrics(lyrics);
             
             // Step 3: Generate audio
+            console.log('Initiating audio generation...');
             await api.generateAudio(this.currentGenerationId);
             
             this.setGenerationState('complete');
@@ -215,8 +221,11 @@ export class SongGenerator {
         return new Promise((resolve, reject) => {
             let pollCount = 0;
             
+            console.log('Starting lyrics polling for songId:', songId);
+            
             this.lyricsPollingInterval = setInterval(async () => {
                 pollCount++;
+                console.log(`Lyrics poll attempt ${pollCount}/${Config.MAX_POLLS}`);
                 
                 if (pollCount > Config.MAX_POLLS) {
                     clearInterval(this.lyricsPollingInterval);
@@ -226,18 +235,23 @@ export class SongGenerator {
                 
                 try {
                     const statusData = await api.getLyricsStatus(songId);
+                    console.log('Lyrics status response:', statusData);
                     
                     // Update progress
-                    this.updateProgress(Utils.statusToPercent(statusData.status));
+                    const progressPercent = Utils.statusToPercent(statusData.status);
+                    console.log(`Progress: ${progressPercent}%`);
+                    this.updateProgress(progressPercent);
                     this.updateStatusMessage(statusData.status);
                     
                     if (statusData.status === 'lyrics_complete' && statusData.lyrics) {
                         clearInterval(this.lyricsPollingInterval);
+                        console.log('Lyrics generation complete!');
                         resolve(statusData.lyrics);
                     } else if (statusData.status === 'lyrics_error') {
                         clearInterval(this.lyricsPollingInterval);
                         reject(new Error('Lyrics generation failed. Please try again.'));
                     }
+                    // Continue polling for other statuses
                     
                 } catch (error) {
                     console.warn(`Lyrics polling attempt ${pollCount} failed:`, error.message);
@@ -246,12 +260,15 @@ export class SongGenerator {
                         clearInterval(this.lyricsPollingInterval);
                         reject(error);
                     }
+                    // Continue polling for other errors
                 }
             }, Config.POLLING_INTERVAL);
         });
     }
 
     setGenerationState(state) {
+        console.log('Setting generation state to:', state);
+        
         const loadingIndicator = document.getElementById('loadingIndicator');
         const progressContainer = document.getElementById('progressContainer');
         const motivateButton = document.getElementById('motivateButton');
@@ -264,7 +281,10 @@ export class SongGenerator {
         
         switch (state) {
             case 'preparing':
-                if (loadingIndicator) loadingIndicator.style.display = 'block';
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'block';
+                    console.log('Showing loading indicator');
+                }
                 if (motivateButton) {
                     motivateButton.disabled = true;
                     motivateButton.textContent = 'GENERATING...';
@@ -273,7 +293,16 @@ export class SongGenerator {
                 break;
                 
             case 'lyrics':
-                if (progressContainer) progressContainer.style.display = 'block';
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                    console.log('Showing progress container');
+                    // Initialize progress to 0
+                    const progressBar = document.getElementById('generationProgress');
+                    if (progressBar) progressBar.value = 0;
+                }
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'block';
+                }
                 this.updateStatusMessage('Generating lyrics...');
                 break;
                 
@@ -282,7 +311,7 @@ export class SongGenerator {
                 if (progressContainer) progressContainer.style.display = 'none';
                 if (motivateButton) {
                     motivateButton.disabled = false;
-                    motivateButton.textContent = `MOTIVATE (${Config.CREDITS_PER_SONG} Credit)`;
+                    motivateButton.textContent = `Generate My Track (${Config.CREDITS_PER_SONG} credit)`;
                 }
                 break;
                 
@@ -291,7 +320,7 @@ export class SongGenerator {
                 if (progressContainer) progressContainer.style.display = 'none';
                 if (motivateButton) {
                     motivateButton.disabled = false;
-                    motivateButton.textContent = `MOTIVATE (${Config.CREDITS_PER_SONG} Credit)`;
+                    motivateButton.textContent = `Generate My Track (${Config.CREDITS_PER_SONG} credit)`;
                 }
                 break;
         }
@@ -301,12 +330,18 @@ export class SongGenerator {
         const progressBar = document.getElementById('generationProgress');
         if (progressBar) {
             progressBar.value = percent;
+            console.log(`Progress bar updated to ${percent}%`);
+        } else {
+            console.error('Progress bar element not found');
         }
     }
-
+    
     updateStatusMessage(status) {
         const loadingMessage = document.getElementById('loadingMessage');
-        if (!loadingMessage) return;
+        if (!loadingMessage) {
+            console.error('Loading message element not found');
+            return;
+        }
         
         const messages = {
             'lyrics_pending': 'Generating lyrics... (This can take a few minutes)',
@@ -318,7 +353,9 @@ export class SongGenerator {
             'complete': 'Generation complete!'
         };
         
-        loadingMessage.textContent = messages[status] || `Status: ${status}`;
+        const message = messages[status] || `Status: ${status}`;
+        loadingMessage.textContent = message;
+        console.log('Status message updated:', message);
     }
 
     displayLyrics(lyrics) {
