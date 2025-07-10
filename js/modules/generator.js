@@ -366,16 +366,54 @@ export class SongGenerator {
     }
 
     showCompletionModal() {
+        console.log('Attempting to show completion modal...');
         const modal = document.getElementById('audioGenerationModal');
-        if (modal && window.bootstrap) {
-            const modalInstance = new bootstrap.Modal(modal);
-            modalInstance.show();
+        
+        if (!modal) {
+            console.error('audioGenerationModal element not found');
+            // Fallback: switch to library tab without modal
+            this.switchToLibraryTab();
+            return;
+        }
+        
+        if (window.bootstrap && window.bootstrap.Modal) {
+            try {
+                const modalInstance = new bootstrap.Modal(modal);
+                modalInstance.show();
+                console.log('Modal shown successfully');
+            } catch (error) {
+                console.error('Error showing modal:', error);
+                // Fallback: switch to library tab without modal
+                this.switchToLibraryTab();
+            }
+        } else {
+            console.warn('Bootstrap Modal not available, switching to library directly');
+            // Fallback: switch to library tab without modal
+            this.switchToLibraryTab();
         }
         
         // Trigger library refresh
         window.dispatchEvent(new CustomEvent('generator:complete', {
             detail: { songId: this.currentGenerationId }
         }));
+    }
+    
+    switchToLibraryTab() {
+        const libraryTabLink = document.querySelector('a[href="#libraryTab"]');
+        if (libraryTabLink && window.bootstrap && window.bootstrap.Tab) {
+            try {
+                const tab = new bootstrap.Tab(libraryTabLink);
+                tab.show();
+                console.log('Switched to library tab');
+            } catch (error) {
+                console.error('Error switching tabs:', error);
+                // Fallback: manual tab switching
+                libraryTabLink.click();
+            }
+        } else if (libraryTabLink) {
+            // Fallback: manual click
+            libraryTabLink.click();
+        }
     }
 
     showError(message) {
