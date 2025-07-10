@@ -213,13 +213,16 @@
               <div class="mb-3">
                 <label for="signupPassword" class="form-label">Password</label>
                 <input type="password" class="form-control custom-input" id="signupPassword" required>
-                <ul class="password-requirements text-muted small mt-2 mb-0" style="list-style: disc; margin-left: 1.5em;">
-                  <li>At least 8 characters</li>
-                  <li>One uppercase letter</li>
-                  <li>One lowercase letter</li>
-                  <li>One number</li>
-                  <li>One special character (e.g. !@#$%^&amp;*)</li>
-                </ul>
+                <div id="passwordRequirementsPopup" class="password-requirements-popup text-muted small" style="display:none; position:absolute; z-index:10; background:#222; color:#fff; border:1px solid #444; border-radius:6px; padding:12px; margin-top:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                  <strong>Password must contain:</strong>
+                  <ul class="mb-0" style="list-style: disc; margin-left: 1.5em;">
+                    <li>At least 8 characters</li>
+                    <li>One uppercase letter</li>
+                    <li>One lowercase letter</li>
+                    <li>One number</li>
+                    <li>One special character (e.g. !@#$%^&amp;*)</li>
+                  </ul>
+                </div>
               </div>
                <div class="mb-3">
                 <label for="signupConfirmPassword" class="form-label">Confirm Password</label>

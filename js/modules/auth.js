@@ -142,6 +142,22 @@ export class AuthManager {
         if (signupForm) {
             signupForm.addEventListener('submit', (e) => this.handleSignup(e));
             console.log('✅ Signup form event listener attached');
+            // Password requirements pop-up logic
+            const signupPasswordInput = document.getElementById('signupPassword');
+            const passwordPopup = document.getElementById('passwordRequirementsPopup');
+            if (signupPasswordInput && passwordPopup) {
+                signupPasswordInput.addEventListener('focus', function() {
+                    // Position the popup below the input
+                    const rect = signupPasswordInput.getBoundingClientRect();
+                    passwordPopup.style.display = 'block';
+                    passwordPopup.style.position = 'absolute';
+                    passwordPopup.style.left = rect.left + window.scrollX + 'px';
+                    passwordPopup.style.top = rect.bottom + window.scrollY + 4 + 'px';
+                });
+                signupPasswordInput.addEventListener('blur', function() {
+                    passwordPopup.style.display = 'none';
+                });
+            }
         }
     }
 
