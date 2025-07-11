@@ -265,7 +265,7 @@ router.all('/cron/process-lyrics-queue', async (req, res) => {
         FROM songs
         WHERE status = 'lyrics_pending'
         ORDER BY created_at ASC
-        LIMIT 1
+        LIMIT 3
         FOR UPDATE SKIP LOCKED`;
       const findResult = await query(findSql);
       songToProcess = findResult.rows[0];
@@ -436,7 +436,7 @@ router.all('/cron/process-audio-queue', async (req, res) => {
       const sunoPayload = {
         customMode: true,
         instrumental: false,
-        model: "V4",
+        model: "V4.5",
         style: musicStyle?.slice(0, 200) || '',
         title: defaultTitle?.slice(0, 80) || 'Untitled',
         prompt: lyrics?.slice(0, 3000) || '',

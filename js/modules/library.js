@@ -279,24 +279,23 @@ export class LibraryManager {
         const libraryEmpty = document.getElementById('libraryEmpty');
         
         if (libraryLoading) {
-            libraryLoading.style.display = show ? 'block' : 'none';
+            if (show) {
+                libraryLoading.innerHTML = `
+                    <div class="text-center">
+                        <div class="spinner-border text-primary mb-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p>Loading your tracks...</p>
+                    </div>
+                `;
+                libraryLoading.style.display = 'block';
+            } else {
+                libraryLoading.style.display = 'none';
+            }
         }
         
         if (libraryEmpty && show) {
             libraryEmpty.style.display = 'none';
-        }
-    }
-
-    showError(message) {
-        // You could implement a more sophisticated error display system
-        console.error('Library error:', message);
-        
-        // For now, just show in the loading area
-        const libraryLoading = document.getElementById('libraryLoading');
-        if (libraryLoading) {
-            libraryLoading.textContent = message;
-            libraryLoading.style.display = 'block';
-            libraryLoading.style.color = 'var(--danger-red)';
         }
     }
 

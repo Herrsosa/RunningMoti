@@ -262,7 +262,7 @@ export class SongGenerator {
                     }
                     // Continue polling for other errors
                 }
-            }, Config.POLLING_INTERVAL);
+            }, 3000);
         });
     }
 
@@ -281,34 +281,45 @@ export class SongGenerator {
         
         switch (state) {
             case 'preparing':
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                    const progressBar = document.getElementById('generationProgress');
+                    if (progressBar) progressBar.value = 5; // Show 5% immediately
+                }
                 if (loadingIndicator) {
                     loadingIndicator.style.display = 'block';
-                    console.log('Showing loading indicator');
                 }
                 if (motivateButton) {
                     motivateButton.disabled = true;
-                    motivateButton.textContent = 'GENERATING...';
+                    motivateButton.textContent = 'STARTING...';
                 }
-                this.updateStatusMessage('Preparing generation...');
+                this.updateStatusMessage('Preparing your track...');
                 break;
                 
             case 'lyrics':
                 if (progressContainer) {
                     progressContainer.style.display = 'block';
-                    console.log('Showing progress container');
-                    // Initialize progress to 0
                     const progressBar = document.getElementById('generationProgress');
-                    if (progressBar) progressBar.value = 0;
+                    if (progressBar) progressBar.value = 15; // Jump to 15%
                 }
                 if (loadingIndicator) {
                     loadingIndicator.style.display = 'block';
                 }
-                this.updateStatusMessage('Generating lyrics...');
+                if (motivateButton) {
+                    motivateButton.textContent = 'WRITING LYRICS...';
+                }
+                this.updateStatusMessage('Creating your personalized lyrics...');
                 break;
                 
             case 'complete':
                 if (loadingIndicator) loadingIndicator.style.display = 'none';
-                if (progressContainer) progressContainer.style.display = 'none';
+                if (progressContainer) {
+                    const progressBar = document.getElementById('generationProgress');
+                    if (progressBar) progressBar.value = 100;
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                    }, 1000); // Hide after 1 second
+                }
                 if (motivateButton) {
                     motivateButton.disabled = false;
                     motivateButton.textContent = `Generate My Track (${Config.CREDITS_PER_SONG} credit)`;
