@@ -109,37 +109,79 @@
 /* Progress Bar Styles */
 #progressContainer {
     margin: 1rem 0;
-    padding: 10px;
+    padding: 15px;
     background-color: var(--input-bg);
-    border-radius: 8px;
-  }
-  
-  #generationProgress {
+    border-radius: 12px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#progressContainer .text-center {
+    margin-bottom: 12px;
+}
+
+#progressContainer small {
+    color: var(--text-light);
+    font-size: 0.9em;
+    display: block;
+    animation: fadeIn 0.5s ease-in;
+}
+
+#generationProgress {
     width: 100%;
-    height: 20px;
-    border-radius: 10px;
+    height: 24px;
+    border-radius: 12px;
     overflow: hidden;
     appearance: none;
     -webkit-appearance: none;
-  }
-  
-  /* Progress bar styling for different browsers */
-  #generationProgress::-webkit-progress-bar {
-    background-color: var(--button-bg);
-    border-radius: 10px;
-  }
-  
-  #generationProgress::-webkit-progress-value {
-    background-color: var(--primary-blue);
-    border-radius: 10px;
-    transition: width 0.5s ease;
-  }
-  
-  #generationProgress::-moz-progress-bar {
-    background-color: var(--primary-blue);
-    border-radius: 10px;
-    transition: width 0.5s ease;
-  }
+    background-color: rgba(255, 255, 255, 0.1);
+    position: relative;
+}
+
+/* Progress bar styling for different browsers */
+#generationProgress::-webkit-progress-bar {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+#generationProgress::-webkit-progress-value {
+    background: linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#generationProgress::-webkit-progress-value::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
+    animation: shimmer 2s infinite;
+}
+
+#generationProgress::-moz-progress-bar {
+    background: linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%);
+    border-radius: 12px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
   .custom-input, .form-select.custom-input { /* Added .form-select.custom-input */
     background-color: var(--input-bg);
@@ -618,5 +660,96 @@
     background-size: 1.2em 1.2em;
     padding-right: 2.5em;
   }
+  
+/* Smooth Animations */
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.slide-up {
+    animation: slideUp 0.5s ease-out;
+}
+
+.slide-in-right {
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Button hover animations */
+.btn, .option-button {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before, .option-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn:hover::before, .option-button:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Input focus animations */
+.custom-input {
+    transition: all 0.3s ease;
+}
+
+.custom-input:focus {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+/* Card hover animations */
+.library-list-item {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.library-list-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    border-color: var(--primary-blue);
+}
+
+/* Loading spinner animation */
+.spinner-border {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
   
   

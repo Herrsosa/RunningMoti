@@ -339,11 +339,32 @@ export class SongGenerator {
 
     updateProgress(percent) {
         const progressBar = document.getElementById('generationProgress');
-        if (progressBar) {
-            progressBar.value = percent;
-            console.log(`Progress bar updated to ${percent}%`);
+        const progressContainer = document.getElementById('progressContainer');
+        
+        if (progressBar && progressContainer) {
+            // Make sure container is visible
+            progressContainer.style.display = 'block';
+            
+            // Smoothly animate to new value
+            const currentValue = progressBar.value || 0;
+            const difference = percent - currentValue;
+            const steps = 10;
+            const stepValue = difference / steps;
+            
+            let step = 0;
+            const interval = setInterval(() => {
+                step++;
+                progressBar.value = currentValue + (stepValue * step);
+                
+                if (step >= steps) {
+                    clearInterval(interval);
+                    progressBar.value = percent; // Ensure exact value
+                }
+            }, 50);
+            
+            console.log(`Progress animated from ${currentValue}% to ${percent}%`);
         } else {
-            console.error('Progress bar element not found');
+            console.error('Progress bar elements not found');
         }
     }
     
@@ -371,8 +392,14 @@ export class SongGenerator {
 
     displayLyrics(lyrics) {
         const lyricsOutput = document.getElementById('lyricsOutput');
-        if (lyricsOutput) {
+        const audioResultContainer = document.getElementById('audioResultContainer');
+        
+        if (lyricsOutput && audioResultContainer) {
             lyricsOutput.textContent = lyrics;
+            
+            // Add animation when showing results
+            audioResultContainer.classList.add('animate__animated', 'animate__fadeIn');
+            audioResultContainer.style.display = 'block';
         }
     }
 
