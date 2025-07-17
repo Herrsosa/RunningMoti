@@ -119,11 +119,18 @@
     margin-bottom: 12px;
 }
 
-#progressContainer small {
-    color: var(--text-light);
+/* Fix text visibility */
+#progressContainer .progress-text {
+    color: var(--text-light) !important; /* Force light text */
     font-size: 0.9em;
     display: block;
     animation: fadeIn 0.5s ease-in;
+}
+
+.progress-percentage {
+    color: var(--primary-blue);
+    font-weight: bold;
+    font-size: 0.9em;
 }
 
 #generationProgress {
@@ -133,6 +140,7 @@
     overflow: hidden;
     appearance: none;
     -webkit-appearance: none;
+    -moz-appearance: none;
     background-color: rgba(255, 255, 255, 0.1);
     position: relative;
 }
@@ -151,33 +159,14 @@
     transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#generationProgress::-webkit-progress-value::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.3) 50%,
-        transparent 100%
-    );
-    animation: shimmer 2s infinite;
-}
-
+/* Firefox */
 #generationProgress::-moz-progress-bar {
     background: linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%);
     border-radius: 12px;
     transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-
+/* Remove shimmer animation - it can cause performance issues */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }

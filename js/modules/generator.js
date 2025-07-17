@@ -223,6 +223,9 @@ export class SongGenerator {
             
             console.log('Starting lyrics polling for songId:', songId);
             
+            // Show initial progress
+            this.updateProgress(10); // Start at 10%
+            
             this.lyricsPollingInterval = setInterval(async () => {
                 pollCount++;
                 console.log(`Lyrics poll attempt ${pollCount}/${Config.MAX_POLLS}`);
@@ -237,9 +240,20 @@ export class SongGenerator {
                     const statusData = await api.getLyricsStatus(songId);
                     console.log('Lyrics status response:', statusData);
                     
-                    // Update progress
-                    const progressPercent = Utils.statusToPercent(statusData.status);
-                    console.log(`Progress: ${progressPercent}%`);
+                    // Calculate progress based on poll count and status
+                    let progressPercent = 10; // Base progress
+                    
+                    if (statusData.status === 'lyrics_processing') {
+                        // Gradually increase during processing
+                        progressPercent = Math.min(10 + (pollCount * 5), 50);
+                    } else if (statusData.status === 'lyrics_complete') {
+                        progressPercent = 60;
+                    } else {
+                        // For pending status, slowly increment
+                        progressPercent = Math.min(10 + (pollCount * 2), 30);
+                    }
+                    
+                    console.log(`Setting progress to ${progressPercent}% for status ${statusData.status}`);
                     this.updateProgress(progressPercent);
                     this.updateStatusMessage(statusData.status);
                     
@@ -251,7 +265,6 @@ export class SongGenerator {
                         clearInterval(this.lyricsPollingInterval);
                         reject(new Error('Lyrics generation failed. Please try again.'));
                     }
-                    // Continue polling for other statuses
                     
                 } catch (error) {
                     console.warn(`Lyrics polling attempt ${pollCount} failed:`, error.message);
@@ -260,7 +273,6 @@ export class SongGenerator {
                         clearInterval(this.lyricsPollingInterval);
                         reject(error);
                     }
-                    // Continue polling for other errors
                 }
             }, 3000);
         });
@@ -340,29 +352,21 @@ export class SongGenerator {
     updateProgress(percent) {
         const progressBar = document.getElementById('generationProgress');
         const progressContainer = document.getElementById('progressContainer');
+        const progressPercent = document.getElementById('progressPercent');
         
         if (progressBar && progressContainer) {
             // Make sure container is visible
             progressContainer.style.display = 'block';
             
-            // Smoothly animate to new value
-            const currentValue = progressBar.value || 0;
-            const difference = percent - currentValue;
-            const steps = 10;
-            const stepValue = difference / steps;
+            // Update progress bar value directly
+            progressBar.value = percent;
             
-            let step = 0;
-            const interval = setInterval(() => {
-                step++;
-                progressBar.value = currentValue + (stepValue * step);
-                
-                if (step >= steps) {
-                    clearInterval(interval);
-                    progressBar.value = percent; // Ensure exact value
-                }
-            }, 50);
+            // Update percentage text
+            if (progressPercent) {
+                progressPercent.textContent = `${Math.round(percent)}%`;
+            }
             
-            console.log(`Progress animated from ${currentValue}% to ${percent}%`);
+            console.log(`Progress updated to ${percent}%`);
         } else {
             console.error('Progress bar elements not found');
         }
