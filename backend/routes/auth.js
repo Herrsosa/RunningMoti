@@ -255,17 +255,12 @@ router.post('/request-password-reset', passwordResetLimiter, async (req, res) =>
         const userResult = await query("SELECT id, email, is_verified FROM users WHERE email = $1", [email]);
         const user = userResult.rows[0];
 
-        if (!user) {
-            // Important: Don't reveal if an email address is registered or not for security reasons.
-            // Send a generic success message even if the user doesn't exist.
+        if (!user || !user.is_verified) {
+            // To prevent user enumeration, always return a generic success message,
+            // even if the user doesn't exist or isn't verified.
+            // This prevents attackers from guessing valid or unverified email addresses.
             console.log(`Password reset requested for non-existent or unverified email: ${email}`);
             return res.status(200).json({ message: "If your email address is in our system, you will receive a password reset link shortly." });
-        }
-
-        // Optionally, only allow password reset for verified users
-        if (!user.is_verified) {
-            console.log(`Password reset requested for unverified email: ${email}. Instructing to verify first.`);
-             return res.status(200).json({ message: "Your email address is not verified. Please verify your email before attempting a password reset. If you need a new verification link, please try signing up again or contact support." });
         }
 
         const resetToken = crypto.randomBytes(32).toString('hex');
@@ -296,18 +291,7 @@ router.post('/request-password-reset', passwordResetLimiter, async (req, res) =>
 
 // ---- NEW: Reset Password Endpoint ----
 router.post('/reset-password', validateSchema(schemas.passwordReset), async (req, res) => {
-    const { token, password, confirmPassword } = req.body;
-
-    if (!token || !password || !confirmPassword) {
-        return res.status(400).json({ error: "Token, new password, and confirm password are required." });
-    }
-    if (password !== confirmPassword) {
-        return res.status(400).json({ error: "Passwords do not match." });
-    }
-    // Add password strength validation here if desired (e.g., minimum length)
-    if (password.length < 6) { // Example: Minimum 6 characters
-        return res.status(400).json({ error: "Password must be at least 6 characters long." });
-    }
+    const { token, password } = req.body; // confirmPassword is no longer needed here as Joi validates it
 
     try {
         const userResult = await query(

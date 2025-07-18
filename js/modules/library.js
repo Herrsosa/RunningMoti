@@ -93,56 +93,84 @@ export class LibraryManager {
     renderLibrary() {
         const libraryContent = document.getElementById('libraryContent');
         const libraryEmpty = document.getElementById('libraryEmpty');
-        
+
         if (!libraryContent || !libraryEmpty) return;
 
-        libraryContent.innerHTML = '';
-
         if (this.songs.length === 0) {
+            libraryContent.innerHTML = ''; // Clear if now empty
             libraryEmpty.style.display = 'block';
             return;
         }
 
         libraryEmpty.style.display = 'none';
-        
+
+        const existingSongIds = new Set(
+            [...libraryContent.children].map(el => el.dataset.songId)
+        );
+        const songsToRender = new Map(this.songs.map(song => [String(song.id), song]));
+
+        // Remove songs that are no longer in the list
+        existingSongIds.forEach(id => {
+            if (!songsToRender.has(id)) {
+                const el = libraryContent.querySelector(`[data-song-id="${id}"]`);
+                if (el) el.remove();
+            }
+        });
+
+        // Add or update songs
         this.songs.forEach(song => {
-            this.renderLibraryItem(song, libraryContent);
+            const songId = String(song.id);
+            const existingEl = libraryContent.querySelector(`[data-song-id="${songId}"]`);
+            if (existingEl) {
+                // Song already exists, update it in place
+                this.updateLibraryItem(song, existingEl);
+            } else {
+                // Song is new, create and append it
+                const newEl = this.createLibraryItem(song);
+                libraryContent.appendChild(newEl);
+            }
         });
     }
 
-    renderLibraryItem(song, container) {
+    createLibraryItem(song) {
         const item = document.createElement('div');
         item.className = 'list-group-item library-list-item';
         item.dataset.songId = song.id;
+        this.updateLibraryItem(song, item); // Reuse updater to populate content
+        return item;
+    }
 
-        const formattedDate = song.created_at 
-            ? new Date(song.created_at).toLocaleDateString() 
+    updateLibraryItem(song, item) {
+        const formattedDate = song.created_at
+            ? new Date(song.created_at).toLocaleDateString()
             : 'N/A';
 
-        // Create item info section
-        const itemInfo = document.createElement('div');
-        itemInfo.className = 'library-item-info';
+        // Check for existing elements to avoid full re-render
+        let itemInfo = item.querySelector('.library-item-info');
+        if (!itemInfo) {
+            itemInfo = document.createElement('div');
+            itemInfo.className = 'library-item-info';
+            item.appendChild(itemInfo);
+        }
+
+        let itemControls = item.querySelector('.library-item-controls');
+        if (!itemControls) {
+            itemControls = document.createElement('div');
+            itemControls.className = 'library-item-controls';
+            item.appendChild(itemControls);
+        }
+
         itemInfo.innerHTML = `
             <h5>${this.escapeHtml(song.title || 'Untitled Song')}</h5>
             <p>Workout: ${this.escapeHtml(song.workout_input || 'N/A')}<br>
             Style: ${this.escapeHtml(song.style_input || 'N/A')} | Date: ${formattedDate}</p>
         `;
 
-        // Create controls section
-        const itemControls = document.createElement('div');
-        itemControls.className = 'library-item-controls';
-
-        // Add status/player based on song status
+        itemControls.innerHTML = ''; // Clear previous controls
         this.addStatusOrPlayer(song, itemControls);
-        
-        // Add delete button if song is not processing
         if (!this.isProcessing(song.status)) {
             this.addDeleteButton(song, itemControls);
         }
-
-        item.appendChild(itemInfo);
-        item.appendChild(itemControls);
-        container.appendChild(item);
     }
 
     addStatusOrPlayer(song, container) {
@@ -167,7 +195,12 @@ export class LibraryManager {
         deleteButton.className = 'btn btn-sm btn-outline-danger btn-delete-song';
         deleteButton.dataset.songId = song.id;
         deleteButton.title = 'Delete Song';
-        deleteButton.textContent = '×';
+        deleteButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+            </svg>
+        `;
         container.appendChild(deleteButton);
     }
 

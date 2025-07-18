@@ -459,7 +459,7 @@ export class AuthManager {
             if (authButtonsDiv) authButtonsDiv.style.display = 'none';
             if (appContainer) appContainer.style.display = 'block';
             if (loggedOutCTA) loggedOutCTA.style.display = 'none';
-            if (exampleSongsSection) exampleSongsSection.style.display = 'none';
+            if (exampleSongsSection) exampleSongsSection.style.display = 'block'; // Always show
             
             // Load cached user data if available
             const cachedUser = Utils.getCache(Config.STORAGE_KEYS.USER_CACHE);
