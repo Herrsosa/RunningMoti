@@ -1,24 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "backend/server.js",
-      "use": "@vercel/node",
-      "config": { "maxDuration": 60 }
-    },
-    { 
-      "src": "*.{html,css,js,png,mp3}", 
-      "use": "@vercel/static" 
-    },
-    { 
-      "src": "js/**/*.js", 
-      "use": "@vercel/static" 
-    },
-    { 
-      "src": "public/audio/*.mp3", 
-      "use": "@vercel/static" 
+  "functions": {
+    "backend/server.js": {
+      "maxDuration": 60
     }
-  ],
+  },
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/server.js" },
     { "src": "/audio/(.*)", "dest": "public/audio/$1" },
