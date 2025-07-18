@@ -218,64 +218,55 @@ export class SongGenerator {
     }
 
     async pollLyricsStatus(songId) {
-        return new Promise((resolve, reject) => {
-            let pollCount = 0;
-            
-            console.log('Starting lyrics polling for songId:', songId);
-            
-            // Show initial progress
-            this.updateProgress(10); // Start at 10%
-            
-            this.lyricsPollingInterval = setInterval(async () => {
-                pollCount++;
-                console.log(`Lyrics poll attempt ${pollCount}/${Config.MAX_POLLS}`);
-                
-                if (pollCount > Config.MAX_POLLS) {
-                    clearInterval(this.lyricsPollingInterval);
-                    reject(new Error('Lyrics generation timed out. Please check your library later.'));
-                    return;
+        const poll = async (pollCount, delay) => {
+            console.log(`Lyrics poll attempt ${pollCount}/${Config.MAX_POLLS}`);
+
+            if (pollCount > Config.MAX_POLLS) {
+                throw new Error('Lyrics generation timed out. Please check your library later.');
+            }
+
+            try {
+                const statusData = await api.getLyricsStatus(songId);
+                console.log('Lyrics status response:', statusData);
+
+                let progressPercent = 10; // Base progress
+                if (statusData.status === 'lyrics_processing') {
+                    progressPercent = Math.min(10 + (pollCount * 5), 50);
+                } else if (statusData.status === 'lyrics_complete') {
+                    progressPercent = 60;
+                } else {
+                    progressPercent = Math.min(10 + (pollCount * 2), 30);
                 }
-                
-                try {
-                    const statusData = await api.getLyricsStatus(songId);
-                    console.log('Lyrics status response:', statusData);
-                    
-                    // Calculate progress based on poll count and status
-                    let progressPercent = 10; // Base progress
-                    
-                    if (statusData.status === 'lyrics_processing') {
-                        // Gradually increase during processing
-                        progressPercent = Math.min(10 + (pollCount * 5), 50);
-                    } else if (statusData.status === 'lyrics_complete') {
-                        progressPercent = 60;
-                    } else {
-                        // For pending status, slowly increment
-                        progressPercent = Math.min(10 + (pollCount * 2), 30);
-                    }
-                    
-                    console.log(`Setting progress to ${progressPercent}% for status ${statusData.status}`);
-                    this.updateProgress(progressPercent);
-                    this.updateStatusMessage(statusData.status);
-                    
-                    if (statusData.status === 'lyrics_complete' && statusData.lyrics) {
-                        clearInterval(this.lyricsPollingInterval);
-                        console.log('Lyrics generation complete!');
-                        resolve(statusData.lyrics);
-                    } else if (statusData.status === 'lyrics_error') {
-                        clearInterval(this.lyricsPollingInterval);
-                        reject(new Error('Lyrics generation failed. Please try again.'));
-                    }
-                    
-                } catch (error) {
-                    console.warn(`Lyrics polling attempt ${pollCount} failed:`, error.message);
-                    
-                    if (error.message?.includes('session has expired')) {
-                        clearInterval(this.lyricsPollingInterval);
-                        reject(error);
-                    }
+
+                this.updateProgress(progressPercent);
+                this.updateStatusMessage(statusData.status);
+
+                if (statusData.status === 'lyrics_complete' && statusData.lyrics) {
+                    console.log('Lyrics generation complete!');
+                    return statusData.lyrics;
+                } else if (statusData.status === 'lyrics_error') {
+                    throw new Error('Lyrics generation failed. Please try again.');
                 }
-            }, 3000);
-        });
+
+                // Schedule the next poll with an increased delay
+                return new Promise(resolve => {
+                    setTimeout(() => resolve(poll(pollCount + 1, delay * 1.5)), delay);
+                });
+
+            } catch (error) {
+                console.warn(`Lyrics polling attempt ${pollCount} failed:`, error.message);
+                if (error.message?.includes('session has expired')) {
+                    throw error; // Re-throw auth errors immediately
+                }
+                // For other errors, continue polling
+                return new Promise(resolve => {
+                     setTimeout(() => resolve(poll(pollCount + 1, delay * 1.5)), delay);
+                });
+            }
+        };
+
+        this.updateProgress(10); // Show initial progress
+        return poll(1, 3000); // Start polling with an initial 3-second delay
     }
 
     setGenerationState(state) {
