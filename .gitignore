@@ -96,3 +96,4 @@ Thumbs.db
 
 # SQLite database file (if used for local development)
 backend/database.sqlite
+.vercel
