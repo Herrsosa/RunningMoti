@@ -1,13 +1,16 @@
 {
   "version": 2,
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": ".",
   "functions": {
     "backend/server.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "runtime": "nodejs18.x"
     }
   },
   "routes": [
     { "src": "/api/(.*)", "dest": "backend/server.js" },
-    { "src": "/audio/(.*)", "dest": "public/audio/$1" },
+    { "src": "/audio/(.*)", "dest": "/audio/$1" },
     { "src": "/js/(.*)", "dest": "/js/$1" },
     { "src": "/(.*)", "dest": "/$1" }
   ],

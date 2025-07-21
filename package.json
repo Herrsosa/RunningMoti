@@ -4,7 +4,8 @@
   "private": true,
   "description": "RunningMoti main project",
   "scripts": {
-    "vercel-build": "echo \"Using builds defined in vercel.json\""
+    "vercel-build": "cd backend && npm install",
+    "start": "cd backend && node server.js"
   },
   "engines": {
     "node": ">=18.0.0"
