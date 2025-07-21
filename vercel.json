@@ -8,11 +8,11 @@
       "runtime": "nodejs18.x"
     }
   },
-  "routes": [
-    { "src": "/api/(.*)", "dest": "backend/server.js" },
-    { "src": "/audio/(.*)", "dest": "/audio/$1" },
-    { "src": "/js/(.*)", "dest": "/js/$1" },
-    { "src": "/(.*)", "dest": "/$1" }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "backend/server.js" },
+    { "source": "/audio/(.*)", "destination": "/audio/$1" },
+    { "source": "/js/(.*)", "destination": "/js/$1" },
+    { "source": "/(.*)", "destination": "/$1" }
   ],
   "headers": [
     {
