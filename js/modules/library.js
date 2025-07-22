@@ -5,6 +5,35 @@ export class LibraryManager {
     constructor(authManager) {
         this.authManager = authManager;
         this.songs = [];
+        this.exampleSongs = [
+            {
+                id: 'example_1',
+                title: 'Running with the pack',
+                workout_input: 'Interval Training',
+                style_input: 'High-Energy Electronic',
+                audio_url: 'public/audio/example_song_1.mp3',
+                status: 'complete',
+                is_example: true
+            },
+            {
+                id: 'example_2',
+                title: 'The final rep',
+                workout_input: 'Weightlifting',
+                style_input: 'Aggressive Rock',
+                audio_url: 'public/audio/example_song_2.mp3',
+                status: 'complete',
+                is_example: true
+            },
+            {
+                id: 'example_3',
+                title: 'Sunrise Yoga Flow',
+                workout_input: 'Yoga Session',
+                style_input: 'Calm Ambient',
+                audio_url: 'public/audio/example_song_3.mp3',
+                status: 'complete',
+                is_example: true
+            }
+        ];
         this.autoRefreshInterval = null;
         
         this.init();
@@ -63,8 +92,10 @@ export class LibraryManager {
     }
 
     async loadLibrary() {
+        this.renderExampleSongs(); // Always render examples
+
         if (!this.authManager.isLoggedIn()) {
-            this.clearLibrary();
+            this.clearUserLibrary(); // Clear only user-generated songs
             return;
         }
 
@@ -105,7 +136,8 @@ export class LibraryManager {
         libraryEmpty.style.display = 'none';
 
         const existingSongIds = new Set(
-            [...libraryContent.children].map(el => el.dataset.songId)
+            [...libraryContent.querySelectorAll('.library-list-item:not(.example-song)')]
+            .map(el => el.dataset.songId)
         );
         const songsToRender = new Map(this.songs.map(song => [String(song.id), song]));
 
@@ -135,6 +167,9 @@ export class LibraryManager {
     createLibraryItem(song) {
         const item = document.createElement('div');
         item.className = 'list-group-item library-list-item';
+        if (song.is_example) {
+            item.classList.add('example-song');
+        }
         item.dataset.songId = song.id;
         this.updateLibraryItem(song, item); // Reuse updater to populate content
         return item;
@@ -191,6 +226,8 @@ export class LibraryManager {
     }
 
     addDeleteButton(song, container) {
+        if (song.is_example) return; // Don't add delete button for example songs
+
         const deleteButton = document.createElement('button');
         deleteButton.className = 'btn btn-sm btn-outline-danger btn-delete-song';
         deleteButton.dataset.songId = song.id;
@@ -332,12 +369,34 @@ export class LibraryManager {
         }
     }
 
+    renderExampleSongs() {
+        const exampleContainer = document.getElementById('exampleSongsContainer');
+        if (!exampleContainer) return;
+
+        exampleContainer.innerHTML = ''; // Clear previous examples
+        this.exampleSongs.forEach(song => {
+            const item = this.createLibraryItem(song);
+            exampleContainer.appendChild(item);
+        });
+    }
+
+    clearUserLibrary() {
+        const libraryContent = document.getElementById('libraryContent');
+        if (libraryContent) {
+            // Remove only non-example songs
+            libraryContent.querySelectorAll('.library-list-item:not(.example-song)').forEach(el => el.remove());
+        }
+        this.songs = [];
+    }
+
     clearLibrary() {
         const libraryContent = document.getElementById('libraryContent');
         const libraryLoading = document.getElementById('libraryLoading');
         const libraryEmpty = document.getElementById('libraryEmpty');
+        const exampleContainer = document.getElementById('exampleSongsContainer');
         
         if (libraryContent) libraryContent.innerHTML = '';
+        if (exampleContainer) exampleContainer.innerHTML = '';
         if (libraryLoading) libraryLoading.style.display = 'none';
         if (libraryEmpty) libraryEmpty.style.display = 'none';
         

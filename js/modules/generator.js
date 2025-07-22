@@ -144,6 +144,11 @@ export class SongGenerator {
             // Step 3: Generate audio
             console.log('Initiating audio generation...');
             await api.generateAudio(this.currentGenerationId);
+            this.setGenerationState('audio');
+
+            // Step 4: Poll for audio completion
+            console.log('Starting audio polling...');
+            await this.pollAudioStatus(this.currentGenerationId);
             
             this.setGenerationState('complete');
             
@@ -269,6 +274,58 @@ export class SongGenerator {
         return poll(1, 3000); // Start polling with an initial 3-second delay
     }
 
+    async pollAudioStatus(songId) {
+        const poll = async (pollCount, delay) => {
+            console.log(`Audio poll attempt ${pollCount}/${Config.MAX_POLLS}`);
+
+            if (pollCount > Config.MAX_POLLS) {
+                throw new Error('Audio generation timed out. Please check your library later.');
+            }
+
+            try {
+                const statusData = await api.getAudioStatus(songId);
+                console.log('Audio status response:', statusData);
+
+                let progressPercent = 60; // Base progress for audio
+                if (statusData.status === 'audio_processing' || statusData.status === 'processing') {
+                    progressPercent = Math.min(60 + (pollCount * 5), 95);
+                } else if (statusData.status === 'complete') {
+                    progressPercent = 100;
+                } else {
+                    progressPercent = Math.min(60 + (pollCount * 2), 80);
+                }
+
+                this.updateProgress(progressPercent);
+                this.updateStatusMessage(statusData.status);
+
+                if (statusData.status === 'complete') {
+                    console.log('Audio generation complete!');
+                    return; // Exit polling
+                } else if (statusData.status === 'error' || statusData.status === 'audio_error') {
+                    throw new Error('Audio generation failed. Please try again.');
+                }
+
+                // Schedule the next poll
+                return new Promise(resolve => {
+                    setTimeout(() => resolve(poll(pollCount + 1, delay)), delay);
+                });
+
+            } catch (error) {
+                console.warn(`Audio polling attempt ${pollCount} failed:`, error.message);
+                if (error.message?.includes('session has expired')) {
+                    throw error; // Re-throw auth errors immediately
+                }
+                // For other errors, continue polling
+                return new Promise(resolve => {
+                     setTimeout(() => resolve(poll(pollCount + 1, delay)), delay);
+                });
+            }
+        };
+
+        this.updateProgress(60); // Show initial audio progress
+        return poll(1, 5000); // Start polling with a 5-second delay
+    }
+
     setGenerationState(state) {
         console.log('Setting generation state to:', state);
         
@@ -312,6 +369,21 @@ export class SongGenerator {
                     motivateButton.textContent = 'WRITING LYRICS...';
                 }
                 this.updateStatusMessage('Creating your personalized lyrics...');
+                break;
+
+            case 'audio':
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                    const progressBar = document.getElementById('generationProgress');
+                    if (progressBar) progressBar.value = 60;
+                }
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'block';
+                }
+                if (motivateButton) {
+                    motivateButton.textContent = 'GENERATING AUDIO...';
+                }
+                this.updateStatusMessage('Composing your track...');
                 break;
                 
             case 'complete':
