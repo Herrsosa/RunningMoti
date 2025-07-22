@@ -423,20 +423,16 @@ router.all('/cron/process-audio-queue', async (req, res) => {
       // Store current credit count in case of refund
       userCredits = user.credits;
   
-      // 3. Deduct credit
-      await query("UPDATE users SET credits = credits - 1 WHERE id = $1", [userId]);
-      console.log(`Deducted 1 credit from user ${userId}.`);
-  
-      // 4. Mark song as processing
+      // 3. Mark song as processing
       await query("UPDATE songs SET status = 'audio_processing' WHERE id = $1", [songId]);
       console.log(`Marked song ${songId} as 'audio_processing'.`);
   
-      // 5. Submit to Suno
+      // 4. Prepare Suno Payload
       const callbackUrl = `${process.env.SUNO_CALLBACK_URL}?songId=${songId}`;
       const sunoPayload = {
         customMode: true,
         instrumental: false,
-        model: "V4.5",
+        model: "v3", // Using the specified model
         style: musicStyle?.slice(0, 200) || '',
         title: defaultTitle?.slice(0, 80) || 'Untitled',
         prompt: lyrics?.slice(0, 3000) || '',
@@ -448,43 +444,49 @@ router.all('/cron/process-audio-queue', async (req, res) => {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.SUNO_API_KEY}`
         },
-        timeout: 10000 // 10s timeout to avoid blocking the function
+        timeout: 15000 // Increased timeout
       };
   
-      let sunoResponse;
-      let sunoTaskId = null;
-      let nextStatus = 'processing';
-  
+      // 5. Submit to Suno and handle response
       try {
         console.log(`Submitting to Suno for song ${songId}...`);
-        sunoResponse = await axios.post(process.env.SUNO_API_ENDPOINT, sunoPayload, sunoConfig);
-        console.log(`Suno response for song ${songId}:`, sunoResponse.data);
-  
-        sunoTaskId = sunoResponse?.data?.data?.taskId || sunoResponse?.data?.taskId || null;
-        nextStatus = sunoTaskId ? 'processing' : 'processing';
-      } catch (err) {
-        console.error(`Suno API request failed for song ${songId}:`, err.message);
-  
-        // If timeout or network error: retry later
-        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-          nextStatus = 'audio_pending'; // retry later
-        }
-      }
-      
-      console.log(`🎵 AUDIO CRON: About to set song ${songId} to status '${nextStatus}'`);
-      console.log(`🎵 AUDIO CRON: sunoTaskId = '${sunoTaskId}'`);
+        const sunoResponse = await axios.post(process.env.SUNO_API_ENDPOINT, sunoPayload, sunoConfig);
+        const sunoTaskId = sunoResponse?.data?.data?.taskId || sunoResponse?.data?.taskId || null;
 
-      // 6. Update song with Suno task ID and final status
-      await query(
-        "UPDATE songs SET suno_task_id = $1, status = $2 WHERE id = $3",
-        [sunoTaskId, nextStatus, songId]
-      );
-      console.log(`Updated song ${songId} to status '${nextStatus}' with task ID '${sunoTaskId || 'N/A'}'.`);
-  
-      return res.status(200).json({
-        message: `Audio job submitted for song ${songId}`,
-        status: nextStatus
-      });
+        if (sunoTaskId) {
+          // SUCCESS: Deduct credit and update song status
+          await query("UPDATE users SET credits = credits - 1 WHERE id = $1", [userId]);
+          console.log(`Deducted 1 credit from user ${userId}.`);
+
+          await query(
+            "UPDATE songs SET suno_task_id = $1, status = 'processing' WHERE id = $2",
+            [sunoTaskId, songId]
+          );
+          console.log(`Updated song ${songId} to status 'processing' with task ID '${sunoTaskId}'.`);
+          
+          return res.status(200).json({
+            message: `Audio job submitted successfully for song ${songId}`,
+            status: 'processing'
+          });
+
+        } else {
+          // FAILURE (but API call succeeded): No task ID returned
+          console.error(`Suno API call for song ${songId} succeeded but returned no task ID. Response:`, sunoResponse.data);
+          await query("UPDATE songs SET status = 'error' WHERE id = $1", [songId]);
+          return res.status(500).json({ error: "Suno API did not return a task ID." });
+        }
+
+      } catch (err) {
+        // FAILURE: API call itself failed
+        console.error(`Suno API request failed for song ${songId}:`, err.response ? JSON.stringify(err.response.data) : err.message);
+        
+        // Reset status to 'audio_pending' so it can be retried
+        await query("UPDATE songs SET status = 'audio_pending' WHERE id = $1", [songId]);
+        console.log(`Reset song ${songId} status to 'audio_pending' for retry.`);
+
+        // No credit was deducted, so no refund is needed.
+        return res.status(500).json({ error: "Failed to submit job to Suno API." });
+      }
   
     } catch (error) {
       console.error("Error in audio cron:", error.message);
