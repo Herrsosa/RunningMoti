@@ -432,7 +432,7 @@ router.all('/cron/process-audio-queue', async (req, res) => {
       const sunoPayload = {
         customMode: true,
         instrumental: false,
-        model: "v3", // Using the specified model
+        model: "V4", // Using a valid Suno model
         style: musicStyle?.slice(0, 200) || '',
         title: defaultTitle?.slice(0, 80) || 'Untitled',
         prompt: lyrics?.slice(0, 3000) || '',
