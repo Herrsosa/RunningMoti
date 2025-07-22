@@ -32,6 +32,9 @@ class App {
             this.songGenerator = new SongGenerator(this.authManager);
             this.libraryManager = new LibraryManager(this.authManager);
 
+            // Manually render example songs on startup
+            this.libraryManager.renderExampleSongs();
+
             // Setup global event listeners
             this.setupGlobalEventListeners();
 
