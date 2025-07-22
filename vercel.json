@@ -4,8 +4,7 @@
   "outputDirectory": ".",
   "functions": {
     "backend/server.js": {
-      "maxDuration": 60,
-      "runtime": "nodejs18.x"
+      "maxDuration": 60
     }
   },
   "rewrites": [
