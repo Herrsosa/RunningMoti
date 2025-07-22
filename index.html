@@ -32,32 +32,10 @@
          </div>
     </header>
 
-    <section id="exampleSongsSection" class="main-container text-white py-5" style="display: none;">
+    <section id="exampleSongsSection" class="main-container text-white py-5">
       <div class="container">
-          <h2 class="text-center mb-4">Hear What You Can Create!</h2>
-          <div class="row">
-              <div class="col-md-4 mb-4">
-                  <div class="example-song-card p-3 bg-dark rounded shadow-sm">
-                      <h5>Motivating Wakeup Call</h5>
-                      <p class="small text-muted mb-2">Style: Epic Electronic | Tone: Triumphant</p>
-                      <audio controls src="audio/example_song_1.mp3" class="w-100"></audio>
-                  </div>
-              </div>
-              <div class="col-md-4 mb-4">
-                  <div class="example-song-card p-3 bg-dark rounded shadow-sm">
-                      <h5>French Spinning Chanson</h5>
-                      <p class="small text-muted mb-2">Style: Aggressive Rock | Tone: Intense</p>
-                      <audio controls src="audio/example_song_2.mp3" class="w-100"></audio>
-                  </div>
-              </div>
-              <div class="col-md-4 mb-4">
-                  <div class="example-song-card p-3 bg-dark rounded shadow-sm">
-                      <h5>Spanish Ultra Reggaeton</h5>
-                      <p class="small text-muted mb-2">Style: Chill Lo-fi | Tone: Peaceful</p>
-                      <audio controls src="audio/example_song_3.mp3" class="w-100"></audio>
-                  </div>
-              </div>
-          </div>
+          <h3 class="text-center mb-4">Hear What You Can Create!</h3>
+          <div id="exampleSongsContainer" class="list-group library-list mb-4"></div>
       </div>
     </section>
 
@@ -164,9 +142,6 @@
             </div>
             <div class="tab-pane fade" id="libraryTab">
                 <section class="library-section form-section">
-                    <h3 class="text-center mb-4">Example Songs</h3>
-                    <div id="exampleSongsContainer" class="list-group library-list mb-4"></div>
-                    <hr>
                     <h3 class="text-center mb-4">Your Library</h3>
                     <div id="libraryContent" class="list-group library-list">
                         <p id="libraryLoading" class="text-center text-muted">Loading library...</p>

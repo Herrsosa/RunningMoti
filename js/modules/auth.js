@@ -451,7 +451,6 @@ export class AuthManager {
         const authButtonsDiv = document.getElementById('authButtons');
         const appContainer = document.getElementById('appContainer');
         const loggedOutCTA = document.getElementById('loggedOutCTA');
-        const exampleSongsSection = document.getElementById('exampleSongsSection');
         
         if (this.currentUser.token) {
             // User is logged in
@@ -459,7 +458,6 @@ export class AuthManager {
             if (authButtonsDiv) authButtonsDiv.style.display = 'none';
             if (appContainer) appContainer.style.display = 'block';
             if (loggedOutCTA) loggedOutCTA.style.display = 'none';
-            if (exampleSongsSection) exampleSongsSection.style.display = 'block'; // Always show
             
             // Load cached user data if available
             const cachedUser = Utils.getCache(Config.STORAGE_KEYS.USER_CACHE);
@@ -477,7 +475,6 @@ export class AuthManager {
             if (authButtonsDiv) authButtonsDiv.style.display = 'block';
             if (appContainer) appContainer.style.display = 'none';
             if (loggedOutCTA) loggedOutCTA.style.display = 'block';
-            if (exampleSongsSection) exampleSongsSection.style.display = 'block';
         }
         
         this.resetForms();
