@@ -3,12 +3,12 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": ".",
   "functions": {
-    "backend/server.js": {
+    "api/index.js": {
       "maxDuration": 60
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "backend/server.js" },
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/audio/(.*)", "destination": "/audio/$1" },
     { "source": "/js/(.*)", "destination": "/js/$1" },
     { "source": "/(.*)", "destination": "/$1" }
