@@ -41,6 +41,7 @@ export class LibraryManager {
 
     init() {
         this.setupEventListeners();
+        this.renderExampleSongs(); // Always render example songs on init
         
         // Listen for tab changes and generation completion
         this.setupTabListener();
