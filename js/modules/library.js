@@ -8,7 +8,7 @@ export class LibraryManager {
         this.exampleSongs = [
             {
                 id: 'example_1',
-                title: 'Running with the pack',
+                title: 'Running With the Pack',
                 workout_input: 'Interval Training',
                 style_input: 'High-Energy Electronic',
                 audio_url: 'public/audio/example_song_1.mp3',
@@ -17,7 +17,7 @@ export class LibraryManager {
             },
             {
                 id: 'example_2',
-                title: 'The final rep',
+                title: 'The Final Rep',
                 workout_input: 'Weightlifting',
                 style_input: 'Aggressive Rock',
                 audio_url: 'public/audio/example_song_2.mp3',

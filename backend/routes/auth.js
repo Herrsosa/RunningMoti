@@ -54,45 +54,29 @@ router.post('/register', authLimiter, validateSchema(schemas.register), async (r
         }
 
         const hashedPassword = await hashPassword(password);
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpiryHours = parseInt(process.env.VERIFICATION_TOKEN_EXPIRES_IN_HOURS || '24', 10);
-        const expiresAt = new Date(Date.now() + tokenExpiryHours * 60 * 60 * 1000);
 
         let userId;
         if (existingUnverifiedUser) {
             userId = existingUnverifiedUser.id;
             const updateSql = `
                 UPDATE users
-                SET password_hash = $1, verification_token = $2, verification_token_expires = $3, username = $4 
-                WHERE id = $5`; // Also update username in case it changed
-            await query(updateSql, [hashedPassword, verificationToken, expiresAt, username, userId]);
-            console.log(`Updated existing unverified user ID: ${userId} for re-verification.`);
+                SET password_hash = $1, username = $2, is_verified = TRUE
+                WHERE id = $3`; // Also update username in case it changed
+            await query(updateSql, [hashedPassword, username, userId]);
+            console.log(`Updated existing unverified user ID: ${userId} and set as verified.`);
         } else {
             const insertSql = `
-                INSERT INTO users (username, email, password_hash, verification_token, verification_token_expires, is_verified, credits)
-                VALUES ($1, $2, $3, $4, $5, FALSE, 2) 
+                INSERT INTO users (username, email, password_hash, is_verified, credits)
+                VALUES ($1, $2, $3, TRUE, 2) 
                 RETURNING id`;
-            const insertResult = await query(insertSql, [username, email, hashedPassword, verificationToken, expiresAt]);
+            const insertResult = await query(insertSql, [username, email, hashedPassword]);
             userId = insertResult.rows[0].id;
-            logger.info('New user registered', { userId, username, email: email.substring(0, 3) + '***' });
-        }
-
-        const emailSent = await sendVerificationEmail(email, verificationToken);
-
-        if (!emailSent) {
-            logger.error('Failed to send verification email', { 
-                userId, 
-                email: email.substring(0, 3) + '***' 
-            });
-            return res.status(201).json({
-                 message: "Registration successful, but failed to send verification email. Please contact support or try verifying later.",
-                 userId: userId
-            });
+            logger.info('New user registered and verified', { userId, username, email: email.substring(0, 3) + '***' });
         }
 
         logger.info('Registration completed successfully', { userId, username });
         res.status(201).json({
-            message: "Registration successful! Please check your email (and spam folder) for a verification link.",
+            message: "Registration successful! You can now log in.",
             userId: userId
         });
 
@@ -141,16 +125,6 @@ router.post('/login', authLimiter, validateSchema(schemas.login), async (req, re
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
-        if (!user.is_verified) {
-            logger.warn('Login attempt by unverified user', { 
-                email: email.substring(0, 3) + '***',
-                userId: user.id,
-                ip: req.ip 
-            });
-            return res.status(403).json({ 
-                error: "Please verify your email address before logging in. Check your inbox (and spam folder)." 
-            });
-        }
         
         const match = await comparePassword(password, user.password_hash);
 
