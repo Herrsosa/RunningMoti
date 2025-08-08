@@ -205,6 +205,10 @@ export class SongGenerator {
         const toneInput = document.getElementById('toneInput');
         const languageInput = document.getElementById('languageInput');
         const customLanguageInput = document.getElementById('customLanguageInput');
+
+        // ⬇️ NEW: read final sprint toggle (true if the button has .active)
+        const finalSprintToggle = document.getElementById('finalSprintToggle');
+        const finalSprint = finalSprintToggle?.classList?.contains('active') || false;
         
         // Determine final values
         const musicStyle = customStyleInput?.value.trim() || musicStyleInput?.value || '';
@@ -218,7 +222,9 @@ export class SongGenerator {
             musicStyle: musicStyle,
             customStyle: customStyleInput?.value.trim() || '',
             tone: toneInput?.value || 'Inspiring',
-            language: language
+            language: language,
+            // ⬇️ NEW
+            finalSprint
         };
     }
 

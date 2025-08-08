@@ -26,16 +26,27 @@
 
     <header class="header-section text-center text-white main-container">
         <h2 class="fuel-fire-text">FUEL YOUR FIRE</h2>
-        <h1 class="main-headline mb-4">Get Your Personalized<br/>Motivational Track</h1>
-         <div id="loggedOutCTA" style="display: block;">
-             <p class="text-muted" style="color: white !important; font-size: 1.5rem;">Login or Sign Up to start creating your tracks with Athletes Motivation!</p>
-         </div>
+        <h1 class="main-headline mb-4">Music that matches your workout</h1>
+        <div id="loggedOutCTA" style="display: block;">
+            <p class="text-muted" style="color: white !important; font-size: 1.5rem;">
+                Experience training like never before with dynamic music that adapts to your pace.
+            </p>
+        </div>
     </header>
 
     <section id="exampleSongsSection" class="main-container text-white py-5">
       <div class="container">
           <h3 class="text-center mb-4">Hear What You Can Create!</h3>
           <div id="exampleSongsContainer" class="list-group library-list mb-4"></div>
+      </div>
+    </section>
+
+    <!-- NEW Demo Strip Section -->
+    <section id="demoStripSection" class="main-container text-white py-5">
+      <div class="container text-center">
+          <h3 class="mb-4">Try it now</h3>
+          <div id="demoPlayerContainer" class="mb-3"></div>
+          <button id="finalSprintToggle" class="btn btn-warning">Final Sprint Mode: OFF</button>
       </div>
     </section>
 
@@ -152,6 +163,7 @@
         </div>
     </div>
 
+    <!-- Login Modal -->
     <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-dark text-light">
@@ -180,6 +192,7 @@
       </div>
     </div>
 
+    <!-- Signup Modal -->
     <div class="modal fade" id="signupModal" tabindex="-1" aria-labelledby="signupModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-dark text-light">
@@ -224,6 +237,7 @@
       </div>
     </div>
 
+    <!-- Audio Generation Modal -->
     <div class="modal fade" id="audioGenerationModal" tabindex="-1" aria-labelledby="audioGenerationModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark text-light">

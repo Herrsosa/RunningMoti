@@ -6,12 +6,18 @@ import { Config, Utils } from './utils/config.js';
 import { performanceMonitor, lazyLoader } from './utils/performance.js';
 import { errorTracker, performanceIssueDetector, trackUserAction } from './utils/errorTracking.js';
 
+// NEW: Demo player for the homepage demo strip
+import { DemoPlayer } from './modules/demo.js';
+
 // Main Application Class
 class App {
     constructor() {
         this.authManager = null;
         this.songGenerator = null;
         this.libraryManager = null;
+
+        // NEW: hold a reference to the demo player
+        this.demoPlayer = null;
         
         this.init();
     }
@@ -52,6 +58,20 @@ class App {
 
             // Check app health
             await this.performHealthCheck();
+
+            // NEW: Initialize demo strip (always available, even when logged out)
+            const demoContainer = document.getElementById('demoPlayerContainer');
+            if (demoContainer) {
+                this.demoPlayer = new DemoPlayer(demoContainer);
+                this.demoPlayer.init();
+
+                const sprintToggle = document.getElementById('finalSprintToggle');
+                if (sprintToggle) {
+                    sprintToggle.addEventListener('click', () => {
+                        this.demoPlayer.toggleFinalSprint();
+                    });
+                }
+            }
 
             console.log('✅ App initialized successfully');
 
